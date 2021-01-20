@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Ant-Version: Apache Ant 1.10.5
+Created-By: 15.0.2+7-27 (Oracle Corporation)
+built-by: tommyx
+Main-Class: app_kvServer.KVServer
+Class-Path: /Users/tommyx/data/projects/ece419-project/M1/m1/bin:/User
+ s/tommyx/data/projects/ece419-project/M1/m1/libs/junit-4.10.jar:/User
+ s/tommyx/data/projects/ece419-project/M1/m1/libs/log4j-1.2.17.jar
+
