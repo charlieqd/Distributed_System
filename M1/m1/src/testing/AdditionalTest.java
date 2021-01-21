@@ -2,6 +2,7 @@ package testing;
 
 import junit.framework.TestCase;
 import org.junit.Test;
+import server.FIFOCache;
 import server.LRUCache;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
@@ -27,12 +28,25 @@ public class AdditionalTest extends TestCase {
     public void testLRUCache() throws IOException, ClassNotFoundException {
         LRUCache LRU = new LRUCache(2);
         LRU.set("address", "toronto");
-        assertEquals(LRU.get("address"), "toronto");
         LRU.set("name", "Alice");
+        assertEquals(LRU.get("address"), "toronto");
         LRU.set("age", "20");
-        assertNull(LRU.get("address"));
-        assertEquals(LRU.get("name"), "Alice");
+        assertNull(LRU.get("name"));
+        assertEquals(LRU.get("address"), "toronto");
         assertEquals(LRU.get("age"), "20");
+
+    }
+
+    @Test
+    public void testFIFOCache() throws IOException, ClassNotFoundException {
+        FIFOCache FIFO = new FIFOCache(2);
+        FIFO.set("address", "toronto");
+        assertEquals(FIFO.get("address"), "toronto");
+        FIFO.set("name", "Alice");
+        FIFO.set("age", "20");
+        assertNull(FIFO.get("address"));
+        assertEquals(FIFO.get("name"), "Alice");
+        assertEquals(FIFO.get("age"), "20");
 
     }
 }
