@@ -2,16 +2,16 @@ package shared;
 
 public class Response {
 
-    public enum Status {
-        OK,
-        BAD_REQUEST
+    public static class Status {
+        public static final int OK = 0;
+        public static final int BAD_REQUEST = 1;
     }
 
     private byte[] body;
     private int id;
-    private Status status;
+    private int status;
 
-    public Response(byte[] body, int id, Status status) {
+    public Response(byte[] body, int id, int status) {
         this.body = body;
         this.id = id;
         this.status = status;
@@ -25,7 +25,7 @@ public class Response {
         return body;
     }
 
-    public Status getStatus() {
+    public int getStatus() {
         return status;
     }
 }
