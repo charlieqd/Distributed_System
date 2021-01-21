@@ -1,7 +1,9 @@
 package shared.messages;
 
-public interface IKVMessageSerializer {
-    KVMessage decode(byte[] bytes);
+import java.io.IOException;
 
-    byte[] encode(KVMessage message);
+public interface IKVMessageSerializer {
+    KVMessage decode(byte[] bytes) throws IOException, ClassNotFoundException;
+
+    byte[] encode(KVMessage message) throws IOException;
 }

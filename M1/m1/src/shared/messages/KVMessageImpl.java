@@ -1,6 +1,12 @@
 package shared.messages;
 
-public class KVMessageImpl implements KVMessage {
+import java.io.Serial;
+import java.io.Serializable;
+
+public class KVMessageImpl implements KVMessage, Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 966087689327304835L;
 
     private String key;
     private String value;
