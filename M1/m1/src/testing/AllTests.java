@@ -6,6 +6,8 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 import logger.LogSetup;
 import org.apache.log4j.Level;
+import shared.Protocol;
+import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
 
@@ -15,7 +17,8 @@ public class AllTests {
     static {
         try {
             new LogSetup("logs/testing/test.log", Level.ERROR);
-            new KVServer(50000, 10, IKVServer.CacheStrategy.FIFO);
+            new KVServer(new Protocol(), new KVMessageSerializer(), 50000, 10,
+                    IKVServer.CacheStrategy.FIFO);
         } catch (IOException e) {
             e.printStackTrace();
         }

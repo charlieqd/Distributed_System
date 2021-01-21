@@ -5,7 +5,9 @@ public interface IProtocol {
 
     Request decodeRequest(byte[] data);
 
-    byte[] encodeResponse(Request request, byte[] encodedMessage);
+    byte[] encodeResponse(Request request,
+                          Response.Status status,
+                          byte[] encodedMessage);
 
     // For client
 

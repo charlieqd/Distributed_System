@@ -4,6 +4,11 @@ import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import server.ClientConnection;
+import shared.IProtocol;
+import shared.ISerializer;
+import shared.Protocol;
+import shared.messages.KVMessage;
+import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
 import java.net.BindException;
@@ -20,24 +25,37 @@ public class KVServer extends Thread implements IKVServer {
     private int port;
     private ServerSocket serverSocket;
     private boolean running;
+    private final IProtocol protocol;
+    private final ISerializer<KVMessage> messageSerializer;
 
     /**
      * Start KV Server at given port
      *
-     * @param port      given port for storage server to operate
-     * @param cacheSize specifies how many key-value pairs the server is allowed
-     *                  to keep in-memory
-     * @param strategy  specifies the cache replacement strategy in case the
-     *                  cache is full and there is a GET- or PUT-request on a
-     *                  key that is currently not contained in the cache.
+     * @param protocol          the message protocol encoder/decoder.
+     * @param messageSerializer serializer for messages.
+     * @param port              given port for storage server to operate
+     * @param cacheSize         specifies how many key-value pairs the server is
+     *                          allowed to keep in-memory
+     * @param strategy          specifies the cache replacement strategy in case
+     *                          the cache is full and there is a GET- or
+     *                          PUT-request on a key that is currently not
+     *                          contained in the cache.
      */
-    public KVServer(int port, int cacheSize, CacheStrategy strategy) {
-        // TODO Auto-generated method stub
+    public KVServer(IProtocol protocol,
+                    ISerializer<KVMessage> messageSerializer,
+                    int port,
+                    int cacheSize,
+                    CacheStrategy strategy) {
+        this.protocol = protocol;
+        this.messageSerializer = messageSerializer;
         this.port = port;
     }
 
-    public KVServer(int port) {
-        this(port, DEFAULT_CACHE_SIZE, DEFAULT_STRATEGY);
+    public KVServer(IProtocol protocol,
+                    ISerializer<KVMessage> messageSerializer,
+                    int port) {
+        this(protocol, messageSerializer, port, DEFAULT_CACHE_SIZE,
+                DEFAULT_STRATEGY);
     }
 
     /**
@@ -54,7 +72,8 @@ public class KVServer extends Thread implements IKVServer {
                 try {
                     Socket client = serverSocket.accept();
                     ClientConnection connection =
-                            new ClientConnection(client);
+                            new ClientConnection(client, protocol,
+                                    messageSerializer);
                     new Thread(connection).start();
 
                     logger.info("Connected to "
@@ -111,13 +130,15 @@ public class KVServer extends Thread implements IKVServer {
      */
     public static void main(String[] args) {
         try {
+            IProtocol protocol = new Protocol();
+            ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
             new LogSetup("logs/server.log", Level.ALL);
             if (args.length != 1) {
                 System.out.println("Error! Invalid number of arguments!");
                 System.out.println("Usage: Server <port>!");
             } else {
                 int port = Integer.parseInt(args[0]);
-                new KVServer(port).start();
+                new KVServer(protocol, messageSerializer, port).start();
             }
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");

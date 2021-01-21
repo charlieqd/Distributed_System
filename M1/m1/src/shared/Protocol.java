@@ -8,7 +8,9 @@ public class Protocol implements IProtocol {
     }
 
     @Override
-    public byte[] encodeResponse(Request request, byte[] encodedMessage) {
+    public byte[] encodeResponse(Request request,
+                                 Response.Status status,
+                                 byte[] encodedMessage) {
         return new byte[0];
     }
 

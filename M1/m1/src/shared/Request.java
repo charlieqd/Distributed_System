@@ -2,11 +2,11 @@ package shared;
 
 public class Request {
 
-    private byte[] message;
+    private byte[] body;
     private int id;
 
-    public Request(byte[] message, int id) {
-        this.message = message;
+    public Request(byte[] body, int id) {
+        this.body = body;
         this.id = id;
     }
 
@@ -14,7 +14,7 @@ public class Request {
         return id;
     }
 
-    public byte[] getMessage() {
-        return message;
+    public byte[] getBody() {
+        return body;
     }
 }
