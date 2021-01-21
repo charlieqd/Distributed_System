@@ -15,7 +15,7 @@ public class KVServer extends Thread implements IKVServer {
     private static Logger logger = Logger.getRootLogger();
 
     private static final int DEFAULT_CACHE_SIZE = 8192;
-    private static final String DEFAULT_STRATEGY = "FIFO";
+    private static final CacheStrategy DEFAULT_STRATEGY = CacheStrategy.FIFO;
 
     private int port;
     private ServerSocket serverSocket;
@@ -30,9 +30,8 @@ public class KVServer extends Thread implements IKVServer {
      * @param strategy  specifies the cache replacement strategy in case the
      *                  cache is full and there is a GET- or PUT-request on a
      *                  key that is currently not contained in the cache.
-     *                  Options are "FIFO", "LRU", and "LFU".
      */
-    public KVServer(int port, int cacheSize, String strategy) {
+    public KVServer(int port, int cacheSize, CacheStrategy strategy) {
         // TODO Auto-generated method stub
         this.port = port;
     }
