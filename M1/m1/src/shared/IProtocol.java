@@ -1,17 +1,26 @@
 package shared;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * NOTE: Protocol methods must be thread-safe.
+ */
 public interface IProtocol {
     // For server
 
-    Request decodeRequest(byte[] data);
+    Request readRequest(InputStream input) throws IOException;
 
-    byte[] encodeResponse(Request request,
-                          Response.Status status,
-                          byte[] encodedMessage);
+    void writeResponse(OutputStream output,
+                       Request request,
+                       int status,
+                       byte[] encodedMessage) throws IOException;
 
     // For client
 
-    byte[] encodeRequest(int id, byte[] encodedMessage);
+    void writeRequest(OutputStream output, int id, byte[] encodedMessage)
+            throws IOException;
 
-    Response decodeResponse(byte[] data);
+    Response readResponse(InputStream input, byte[] data) throws IOException;
 }
