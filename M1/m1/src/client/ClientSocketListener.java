@@ -1,6 +1,6 @@
 package client;
 
-import shared.messages.TextMessage;
+import shared.messages.KVMessage;
 
 public interface ClientSocketListener {
 
@@ -8,7 +8,7 @@ public interface ClientSocketListener {
 
     ;
 
-    public void handleNewMessage(TextMessage msg);
+    public void handleNewMessage(KVMessage msg);
 
     public void handleStatus(SocketStatus status);
 }
