@@ -30,8 +30,12 @@ public class Protocol implements IProtocol {
 
         stream.writeInt(request.getId()); // id
         stream.writeInt(status); // status
-        stream.writeInt(encodedMessage.length); // bodySize
-        stream.write(encodedMessage); // body
+        if (encodedMessage == null) {
+            stream.writeInt(0); // bodySize
+        } else {
+            stream.writeInt(encodedMessage.length); // bodySize
+            stream.write(encodedMessage); // body
+        }
         stream.flush();
     }
 
@@ -42,8 +46,12 @@ public class Protocol implements IProtocol {
         DataOutputStream stream = new DataOutputStream(output);
 
         stream.writeInt(id); // id
-        stream.writeInt(encodedMessage.length); // bodySize
-        stream.write(encodedMessage); // body
+        if (encodedMessage == null) {
+            stream.writeInt(0); // bodySize
+        } else {
+            stream.writeInt(encodedMessage.length); // bodySize
+            stream.write(encodedMessage); // body
+        }
         stream.flush();
     }
 
