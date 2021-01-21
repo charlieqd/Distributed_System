@@ -56,7 +56,7 @@ public class Protocol implements IProtocol {
     }
 
     @Override
-    public Response readResponse(InputStream input, byte[] data) throws
+    public Response readResponse(InputStream input) throws
             IOException {
         DataInputStream stream = new DataInputStream(input);
 

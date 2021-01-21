@@ -22,5 +22,5 @@ public interface IProtocol {
     void writeRequest(OutputStream output, int id, byte[] encodedMessage)
             throws IOException;
 
-    Response readResponse(InputStream input, byte[] data) throws IOException;
+    Response readResponse(InputStream input) throws IOException;
 }
