@@ -1,7 +1,17 @@
 package shared;
 
 public interface IProtocol {
-    public byte[] encode(byte[] message);
+    // For server
 
-    public ProtocolData decode(byte[] data);
+    Request decodeRequest(byte[] data);
+
+    byte[] encodeResponse(Request request,
+                          Response.Status status,
+                          byte[] encodedMessage);
+
+    // For client
+
+    byte[] encodeRequest(int id, byte[] encodedMessage);
+
+    Response decodeResponse(byte[] data);
 }

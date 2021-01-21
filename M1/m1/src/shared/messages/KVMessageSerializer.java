@@ -1,8 +1,10 @@
 package shared.messages;
 
+import shared.ISerializer;
+
 import java.io.*;
 
-public class KVMessageSerializer implements IKVMessageSerializer {
+public class KVMessageSerializer implements ISerializer<KVMessage> {
     @Override
     public KVMessage decode(byte[] bytes) throws IOException,
             ClassNotFoundException {
