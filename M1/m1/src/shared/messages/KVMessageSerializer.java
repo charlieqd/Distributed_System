@@ -1,13 +1,22 @@
 package shared.messages;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 
 public class KVMessageSerializer implements IKVMessageSerializer {
     @Override
-    public KVMessage decode(byte[] bytes) {
-        return null;
+    public KVMessage decode(byte[] bytes) throws IOException,
+            ClassNotFoundException {
+        try (ByteArrayInputStream stream = new ByteArrayInputStream(bytes)) {
+            try (ObjectInputStream objectStream = new ObjectInputStream(
+                    stream)) {
+                try {
+                    return ((KVMessage) objectStream.readObject());
+                } catch (ClassCastException exception) {
+                    throw new ClassNotFoundException(
+                            "Failed to cast to KVMessage");
+                }
+            }
+        }
     }
 
     @Override
