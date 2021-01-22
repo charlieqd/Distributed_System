@@ -56,6 +56,9 @@ public class ClientConnection implements Runnable {
             output = clientSocket.getOutputStream();
             input = clientSocket.getInputStream();
 
+            sendResponse(output, null, Response.Status.CONNECTION_ESTABLISHED,
+                    null);
+
             while (isOpen) {
                 try {
                     Request request = receiveRequest(input);

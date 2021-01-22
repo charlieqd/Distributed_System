@@ -28,7 +28,11 @@ public class Protocol implements IProtocol {
                               byte[] encodedMessage) throws IOException {
         DataOutputStream stream = new DataOutputStream(output);
 
-        stream.writeInt(request.getId()); // id
+        if (request == null) {
+            stream.writeInt(-1); // id
+        } else {
+            stream.writeInt(request.getId()); // id
+        }
         stream.writeInt(status); // status
         if (encodedMessage == null) {
             stream.writeInt(0); // bodySize

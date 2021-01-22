@@ -5,7 +5,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * NOTE: Protocol methods must be thread-safe.
+ * NOTE: - Protocol methods must be thread-safe. - Each ID must be
+ * non-negative.
  */
 public interface IProtocol {
     // For server
