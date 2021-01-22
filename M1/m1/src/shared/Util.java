@@ -5,6 +5,15 @@ import java.util.List;
 
 public class Util {
     /**
+     * An array mapping from a number between 0 and 15 (inclusive) to its hex
+     * representation.
+     */
+    public static char[] hexToChar = {
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
+    /**
      * Make a string suitable for storage into comma-separated format, by adding
      * a backslash character before every comma, line-break, and backslash in
      * the string.

@@ -49,7 +49,7 @@ public class LRUCache<K, V> implements Cache<K, V> {
     }
 
     @Override
-    public void set(K key, V value) {
+    public void put(K key, V value) {
         if (dic.containsKey(key)) {
             this.removeNode(dic.get(key));
         }
