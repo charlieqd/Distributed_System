@@ -6,6 +6,7 @@ import shared.ISerializer;
 import shared.Request;
 import shared.Response;
 import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -115,6 +116,32 @@ public class ClientConnection implements Runnable {
 
         switch (requestMessage.getStatus()) {
             case GET -> {
+                String key = requestMessage.getKey();
+                if (key == null) {
+                    responseMessage = new KVMessageImpl(null, "Invalid key",
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
+
+                String value;
+                try {
+                    value = storage.get(key);
+                } catch (IOException e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error",
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
+
+                if (value == null) {
+                    responseMessage = new KVMessageImpl(key, null,
+                            KVMessage.StatusType.GET_ERROR);
+                    break;
+                } else {
+                    responseMessage = new KVMessageImpl(key, value,
+                            KVMessage.StatusType.GET_SUCCESS);
+                    break;
+                }
             }
             case PUT -> {
             }

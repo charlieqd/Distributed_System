@@ -1,18 +1,20 @@
 package server;
 
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class KVStorage implements IKVStorage {
 
     private static KVStorage current = null;
 
-    private ConcurrentHashMap<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, IKVFileStorage> files = new ConcurrentHashMap<>();
 
     private final KeyHashStrategy keyHashStrategy;
+    private final String rootPath;
 
     public KVStorage(String rootPath, KeyHashStrategy keyHashStrategy) {
+        this.rootPath = rootPath;
         if (current == null) {
             throw new IllegalStateException(
                     "Cannot have more than one KVStorage instance");
@@ -23,37 +25,20 @@ public class KVStorage implements IKVStorage {
     }
 
     @Override
-    public String get(String key) {
-        String hash = keyHashStrategy.hashKey(key);
-        // Create lock if not present
-        Lock lock = fileLocks.computeIfAbsent(hash, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            // TODO implement
-            return "";
-        } finally {
-            lock.unlock();
-            // Remove lock if no thread is holding the lock
-            fileLocks.computeIfPresent(hash, (k, v) -> {
-                return v.isLocked() ? null : v;
-            });
-        }
+    public String get(String key) throws IOException {
+        IKVFileStorage fileStorage = getFileStorage(key);
+        return fileStorage.read(key);
     }
 
     @Override
-    public void put(String key, String value) {
+    public void put(String key, String value) throws IOException {
+        IKVFileStorage fileStorage = getFileStorage(key);
+        fileStorage.write(key, value);
+    }
+
+    private IKVFileStorage getFileStorage(String key) {
         String hash = keyHashStrategy.hashKey(key);
-        // Create lock if not present
-        Lock lock = fileLocks.computeIfAbsent(hash, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            // TODO implement
-        } finally {
-            lock.unlock();
-            // Remove lock if no thread is holding the lock
-            fileLocks.computeIfPresent(hash, (k, v) -> {
-                return v.isLocked() ? null : v;
-            });
-        }
+        return files.computeIfAbsent(hash, k -> new KVFileStorage(
+                Paths.get(rootPath, hash).toString()));
     }
 }
