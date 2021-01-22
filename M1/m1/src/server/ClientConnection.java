@@ -115,14 +115,13 @@ public class ClientConnection implements Runnable {
         // TODO
 
         switch (requestMessage.getStatus()) {
-            case GET -> {
+            case GET:
                 String key = requestMessage.getKey();
                 if (key == null) {
                     responseMessage = new KVMessageImpl(null, "Invalid key",
                             KVMessage.StatusType.FAILED);
                     break;
                 }
-
                 String value;
                 try {
                     value = storage.get(key);
@@ -132,7 +131,6 @@ public class ClientConnection implements Runnable {
                             KVMessage.StatusType.FAILED);
                     break;
                 }
-
                 if (value == null) {
                     responseMessage = new KVMessageImpl(key, null,
                             KVMessage.StatusType.GET_ERROR);
@@ -142,14 +140,14 @@ public class ClientConnection implements Runnable {
                             KVMessage.StatusType.GET_SUCCESS);
                     break;
                 }
-            }
-            case PUT -> {
-            }
-            default -> {
+
+            case PUT:
+                break;
+
+            default:
                 sendResponse(output, request, Response.Status.BAD_REQUEST,
                         null);
                 return;
-            }
         }
 
         sendResponse(output, request, Response.Status.OK,
