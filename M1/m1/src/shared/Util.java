@@ -1,5 +1,8 @@
 package shared;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Util {
     /**
      * Make a string suitable for storage into comma-separated format, by adding
@@ -70,8 +73,20 @@ public class Util {
      *
      * @return the list of columns.
      */
-    public static String[] csvSplitLine(String line) {
-        // TODO implement
-        return new String[0];
+    public static List<String> csvSplitLine(String line) {
+        ArrayList<String> result = new ArrayList<>();
+        int length = line.length();
+        int i, start = 0;
+        for (i = 0; i < length; ++i) {
+            char c = line.charAt(i);
+            if (c == ',') {
+                result.add(unescapeCSVString(line.substring(start, i)));
+                start = i + 1;
+            } else if (c == '\\') {
+                ++i; // Skip over the next character
+            }
+        }
+        result.add(unescapeCSVString(line.substring(start, i)));
+        return result;
     }
 }
