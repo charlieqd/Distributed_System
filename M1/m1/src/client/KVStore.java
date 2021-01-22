@@ -1,7 +1,11 @@
 package client;
 
 import org.apache.log4j.Logger;
+import shared.Protocol;
+import shared.Response;
 import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
+import shared.messages.KVMessageSerializer;
 import shared.messages.TextMessage;
 
 import java.io.IOException;
@@ -9,6 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.Set;
 
 public class KVStore extends Thread implements KVCommInterface {
@@ -31,14 +36,20 @@ public class KVStore extends Thread implements KVCommInterface {
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
     private String serverAddress;
     private int serverPort;
+    private int nextId;
+    private Hashtable<int, Response> idToResponse;
+
+    private KVMessageSerializer serializer;
+    private Protocol protocol;
 
 
     public KVStore(String address, int port) throws IOException {
         // TODO Auto-generated method stub
-        clientSocket = new Socket(address, port);
-        listeners = new HashSet<ClientSocketListener>();
-        setRunning(true);
-        logger.info("Connection established");
+        serverAddress = address;
+        serverPort = port;
+        nextId = 0;
+        idToResponse = new Hashtable<int, Response>();
+        logger.info("KVStore Initialized");
     }
 
     private void setRunning(boolean run) {
@@ -101,6 +112,11 @@ public class KVStore extends Thread implements KVCommInterface {
         clientSocket = new Socket(serverAddress, serverPort);
         output = clientSocket.getOutputStream();
         input = clientSocket.getInputStream();
+        listeners = new HashSet<ClientSocketListener>();
+        setRunning(true);
+        serializer = new KVMessageSerializer();
+        protocol = new Protocol();
+        logger.info("Connection established");
     }
 
     @Override
@@ -122,13 +138,40 @@ public class KVStore extends Thread implements KVCommInterface {
     @Override
     public KVMessage put(String key, String value) throws Exception {
         // TODO Auto-generated method stub
-        
-        return null;
+//        KVMessageSerializer s = new KVMessageSerializer();
+        KVMessage kvMsg = new KVMessageImpl(key, value,
+                KVMessage.StatusType.PUT);
+        byte[] msgBytes = serializer.encode(kvMsg);
+//        Protocol p = new Protocol();
+        protocol.writeRequest(output, nextId, msgBytes);
+        idToResponse.put(nextId, null);
+        nextId += 1;
+        /*Returns:
+        a message that confirms the insertion of the tuple or an error.
+        Throws:
+        Exception – if put command cannot be executed (e.g. not connected to any KV server).*/
+        //??
+        return protocol.readResponse(input);
     }
 
     @Override
     public KVMessage get(String key) throws Exception {
         // TODO Auto-generated method stub
+//        KVMessageSerializer serializer = new KVMessageSerializer();
+        KVMessage kvMsg = new KVMessageImpl(key, null,
+                KVMessage.StatusType.GET);
+        byte[] msgBytes = serializer.encode(kvMsg);
+//        Protocol p = new Protocol();
+        protocol.writeRequest(output, nextId, msgBytes);
+        idToResponse.put(nextId, null);
+        nextId += 1;
+//        Returns:
+//        the value, which is indexed by the given key.
+//        Throws:
+//        Exception – if put command cannot be executed (e.g. not connected to any KV server).
+//        ???
+
+
         return null;
     }
 

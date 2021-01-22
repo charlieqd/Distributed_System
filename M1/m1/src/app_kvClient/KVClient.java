@@ -10,8 +10,6 @@ import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import shared.messages.KVMessage;
-import shared.messages.KVMessageImpl;
-import shared.messages.TextMessage;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -106,7 +104,9 @@ public class KVClient implements IKVClient, ClientSocketListener {
             if (tokens.length == 3) {
                 if (kvclient != null && kvclient.isRunning()) {
                     String msg = tokenToString(tokens);
-                    putData(msg);
+                    String key = tokens[1];
+                    String value = tokens[2];
+                    putData(key, value);
                 } else {
                     printError("Not connected!");
                 }
@@ -118,7 +118,8 @@ public class KVClient implements IKVClient, ClientSocketListener {
             if (tokens.length == 2) {
                 if (kvclient != null && kvclient.isRunning()) {
                     String msg = tokenToString(tokens);
-                    getData(msg);
+                    String key = tokens[1];
+                    getData(key);
                 } else {
                     printError("Not connected!");
                 }
@@ -134,10 +135,11 @@ public class KVClient implements IKVClient, ClientSocketListener {
         }
     }
 
-    private void putData(String msg) throws Exception {
+    private void putData(String key, String value) throws Exception {
         try {
-            KVMessage kvMsg = new KVMessageImpl(msg);
-            KVMessage response = kvclient.put(kvMsg.getKey(), kvMsg.getValue());
+            KVMessage response = kvclient.put(key, value);
+
+
             KVMessage.StatusType responseStatus = response.getStatus();
             if (responseStatus == KVMessage.StatusType.PUT_ERROR) {
                 printError("Put Error!");
@@ -155,10 +157,9 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
     }
 
-    private void getData(String msg) throws Exception {
+    private void getData(String key) throws Exception {
         try {
-            KVMessage kvMsg = new KVMessageImpl(msg);
-            KVMessage response = kvclient.get(kvMsg.getKey());
+            KVMessage response = kvclient.get(key);
             KVMessage.StatusType responseStatus = response.getStatus();
             if (responseStatus == KVMessage.StatusType.GET_ERROR) {
                 printError("Get Error!");
@@ -184,6 +185,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
     @Override
     public void newConnection(String address, int port) throws Exception {
         kvclient = new KVStore(address, port);
+        kvclient.connect();
         kvclient.addListener(this);
         kvclient.start();
     }
@@ -263,9 +265,12 @@ public class KVClient implements IKVClient, ClientSocketListener {
     }
 
     @Override
-    public void handleNewMessage(TextMessage msg) {
+    public void handleNewMessage(KVMessage msg) {
         if (!stop) {
-            System.out.println(msg.getMsg());
+            String status = msg.getStatus().name();
+            String key = msg.getKey();
+            String value = msg.getValue();
+            System.out.println(status + " " + key + " " + value);
             System.out.print(PROMPT);
         }
     }
@@ -286,10 +291,10 @@ public class KVClient implements IKVClient, ClientSocketListener {
         }
 
     }
-    
+
     @Override
     public KVCommInterface getStore() {
-        return null;
+        return kvclient;
     }
 
     private void printError(String error) {
@@ -301,7 +306,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
      *
      * @param args contains the port number at args[0].
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         try {
             new LogSetup("logs/client.log", Level.OFF);
             KVClient app = new KVClient();

@@ -48,7 +48,7 @@ public class Client extends Thread {
                 try {
                     TextMessage latestMsg = receiveMessage();
                     for (ClientSocketListener listener : listeners) {
-                        listener.handleNewMessage(latestMsg);
+//                        listener.handleNewMessage(latestMsg);
                     }
                 } catch (IOException ioe) {
                     if (isRunning()) {
