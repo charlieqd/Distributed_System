@@ -17,7 +17,8 @@ public class AllTests {
     static {
         try {
             new LogSetup("logs/testing/test.log", Level.ERROR);
-            new KVServer(new Protocol(), new KVMessageSerializer(), 50000, 10,
+            new KVServer(new FakeKVStorage(), new Protocol(),
+                    new KVMessageSerializer(), 50000, 10,
                     IKVServer.CacheStrategy.FIFO);
         } catch (IOException e) {
             e.printStackTrace();

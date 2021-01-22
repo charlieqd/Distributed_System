@@ -30,6 +30,7 @@ public class ClientConnection implements Runnable {
     private final Socket clientSocket;
     private InputStream input;
     private OutputStream output;
+    private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
 
@@ -39,10 +40,12 @@ public class ClientConnection implements Runnable {
      * @param clientSocket the Socket object for the client connection.
      */
     public ClientConnection(Socket clientSocket,
+                            IKVStorage storage,
                             IProtocol protocol,
                             ISerializer<KVMessage> messageSerializer) {
         this.clientSocket = clientSocket;
         this.isOpen = true;
+        this.storage = storage;
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
     }
@@ -73,10 +76,9 @@ public class ClientConnection implements Runnable {
                         continue;
                     }
 
-                    KVMessage responseMessage = null; // TODO
+                    // TODO bad request if key is null
 
-                    sendResponse(output, request, Response.Status.OK,
-                            responseMessage);
+                    handleMessage(output, request, requestMessage);
 
                 } catch (IOException ioe) {
                     /* connection either terminated by the client or lost due to
@@ -101,6 +103,30 @@ public class ClientConnection implements Runnable {
                 logger.error("Error! Unable to tear down connection!", ioe);
             }
         }
+    }
+
+    private void handleMessage(OutputStream output,
+                               Request request,
+                               KVMessage requestMessage) throws IOException {
+
+        KVMessage responseMessage = null;
+
+        // TODO
+
+        switch (requestMessage.getStatus()) {
+            case GET -> {
+            }
+            case PUT -> {
+            }
+            default -> {
+                sendResponse(output, request, Response.Status.BAD_REQUEST,
+                        null);
+                return;
+            }
+        }
+
+        sendResponse(output, request, Response.Status.OK,
+                responseMessage);
     }
 
     /**
