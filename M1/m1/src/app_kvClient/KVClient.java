@@ -2,7 +2,6 @@ package app_kvClient;
 
 //import client.Client;
 
-import client.Client;
 import client.ClientSocketListener;
 import client.KVCommInterface;
 import client.KVStore;
@@ -21,7 +20,6 @@ public class KVClient implements IKVClient, ClientSocketListener {
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "419Client> ";
     private BufferedReader stdin;
-    private Client client = null; //del
     private KVStore kvclient = null;
     private boolean stop = false;
 
@@ -67,7 +65,6 @@ public class KVClient implements IKVClient, ClientSocketListener {
                 try {
                     serverAddress = tokens[1];
                     serverPort = Integer.parseInt(tokens[2]);
-//                    connect(serverAddress, serverPort);
                     newConnection(serverAddress, serverPort);
                 } catch (NumberFormatException nfe) {
                     printError("No valid address. Port must be a number!");
@@ -103,7 +100,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
         } else if (tokens[0].equals("put")) {
             if (tokens.length == 3) {
                 if (kvclient != null && kvclient.isRunning()) {
-                    String msg = tokenToString(tokens);
+//                    String msg = tokenToString(tokens);
                     String key = tokens[1];
                     String value = tokens[2];
                     putData(key, value);
@@ -117,7 +114,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
         } else if (tokens[0].equals("get")) {
             if (tokens.length == 2) {
                 if (kvclient != null && kvclient.isRunning()) {
-                    String msg = tokenToString(tokens);
+//                    String msg = tokenToString(tokens);
                     String key = tokens[1];
                     getData(key);
                 } else {
@@ -137,15 +134,13 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
     private void putData(String key, String value) throws Exception {
         try {
-            KVMessage response = kvclient.put(key, value);
-
-
-            KVMessage.StatusType responseStatus = response.getStatus();
-            if (responseStatus == KVMessage.StatusType.PUT_ERROR) {
+            KVMessage msgBack = kvclient.put(key, value);
+            KVMessage.StatusType status = msgBack.getStatus();
+            if (status == KVMessage.StatusType.PUT_ERROR) {
                 printError("Put Error!");
-            } else if (responseStatus == KVMessage.StatusType.PUT_SUCCESS) {
+            } else if (status == KVMessage.StatusType.PUT_SUCCESS) {
                 System.out.println("Put Data Success!");
-            } else if (responseStatus == KVMessage.StatusType.PUT_UPDATE) {
+            } else if (status == KVMessage.StatusType.PUT_UPDATE) {
                 System.out.println("Put Update Success!");
             } else {
                 printError("Unexpected Response Type From Put Request!");
@@ -154,32 +149,26 @@ public class KVClient implements IKVClient, ClientSocketListener {
             printError("Unable to send put request!");
             newDisconnection();
         }
-
     }
 
     private void getData(String key) throws Exception {
         try {
-            KVMessage response = kvclient.get(key);
-            KVMessage.StatusType responseStatus = response.getStatus();
-            if (responseStatus == KVMessage.StatusType.GET_ERROR) {
+            KVMessage msgBack = kvclient.get(key);
+            KVMessage.StatusType status = msgBack.getStatus();
+            String value = msgBack.getValue();
+            if (status == KVMessage.StatusType.GET_ERROR) {
                 printError("Get Error!");
-            } else if (responseStatus == KVMessage.StatusType.GET_SUCCESS) {
+            } else if (status == KVMessage.StatusType.GET_SUCCESS) {
                 System.out.println("Get Data Success!");
+                System.out.println(value);
             } else {
                 printError("Unexpected Response Type From GET Request!");
             }
         } catch (IOException e) {
-            printError("Unable to send put request!");
+            printError("Unable to send GET request!");
             newDisconnection();
         }
 
-    }
-
-    private void connect(String address, int port)
-            throws UnknownHostException, IOException {
-        client = new Client(address, port);
-        client.addListener(this);
-        client.start();
     }
 
     @Override
@@ -187,19 +176,12 @@ public class KVClient implements IKVClient, ClientSocketListener {
         kvclient = new KVStore(address, port);
         kvclient.connect();
         kvclient.addListener(this);
-        kvclient.start();
-    }
-
-    private void disconnect() {
-        if (client != null) {
-            client.closeConnection();
-            client = null;
-        }
+//        kvclient.start();
     }
 
     private void newDisconnection() {
         if (kvclient != null) {
-            kvclient.closeConnection();
+            kvclient.disconnect();
             kvclient = null;
         }
     }
@@ -215,7 +197,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
         sb.append(PROMPT).append("put <key> <value>");
         sb.append("\t\t insert or update a new tuple to the server \n");
         sb.append(PROMPT).append("get <key>");
-        sb.append("\t\t get the value of the key from the server \n");
+        sb.append("\t\t\t get the value of the key from the server \n");
         sb.append(PROMPT).append("disconnect");
         sb.append("\t\t\t disconnects from the server \n");
 
