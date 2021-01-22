@@ -37,19 +37,11 @@ public class KVServer extends Thread implements IKVServer {
      * @param protocol          the message protocol encoder/decoder.
      * @param messageSerializer serializer for messages.
      * @param port              given port for storage server to operate
-     * @param cacheSize         specifies how many key-value pairs the server is
-     *                          allowed to keep in-memory
-     * @param cacheStrategy     specifies the cache replacement strategy in case
-     *                          the cache is full and there is a GET- or
-     *                          PUT-request on a key that is currently not
-     *                          contained in the cache.
      */
     public KVServer(IKVStorage storage,
                     IProtocol protocol,
                     ISerializer<KVMessage> messageSerializer,
-                    int port,
-                    int cacheSize,
-                    CacheStrategy cacheStrategy) {
+                    int port) {
         this.storage = storage;
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
@@ -142,7 +134,8 @@ public class KVServer extends Thread implements IKVServer {
                 System.exit(1);
             }
 
-            IKVStorage storage = new KVStorage(rootPath, keyHashStrategy);
+            IKVStorage storage = new KVStorage(rootPath, keyHashStrategy,
+                    cacheSize, cacheStrategy);
             IProtocol protocol = new Protocol();
             ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
             new LogSetup("logs/server.log", Level.ALL);
@@ -151,8 +144,8 @@ public class KVServer extends Thread implements IKVServer {
                 System.out.println("Usage: Server <port>!");
             } else {
                 int port = Integer.parseInt(args[0]);
-                new KVServer(storage, protocol, messageSerializer, port,
-                        cacheSize, cacheStrategy).start();
+                new KVServer(storage, protocol, messageSerializer, port)
+                        .start();
             }
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");

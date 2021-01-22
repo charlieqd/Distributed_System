@@ -1,6 +1,5 @@
 package testing;
 
-import app_kvServer.IKVServer;
 import app_kvServer.KVServer;
 import junit.framework.Test;
 import junit.framework.TestSuite;
@@ -18,8 +17,7 @@ public class AllTests {
         try {
             new LogSetup("logs/testing/test.log", Level.ERROR);
             new KVServer(new FakeKVStorage(), new Protocol(),
-                    new KVMessageSerializer(), 50000, 10,
-                    IKVServer.CacheStrategy.FIFO);
+                    new KVMessageSerializer(), 5000);
         } catch (IOException e) {
             e.printStackTrace();
         }

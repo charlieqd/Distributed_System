@@ -3,7 +3,7 @@ package server;
 import java.io.IOException;
 
 /**
- * NOTE: Methods must be thread-safe.
+ * NOTE: Methods may not be thread-safe.
  */
 public interface IKVFileStorage {
     public String read(String key) throws IOException;

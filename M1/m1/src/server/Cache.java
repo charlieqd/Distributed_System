@@ -1,5 +1,8 @@
 package server;
 
+/**
+ * NOTE: Methods may not be thread-safe.
+ */
 public interface Cache<K, V> {
     /**
      * @return current size of thr cache
