@@ -1,6 +1,7 @@
 package testing;
 
 import server.IKVStorage;
+import shared.messages.KVMessage;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -13,11 +14,21 @@ public class FakeKVStorage implements IKVStorage {
     }
 
     @Override
-    public void put(String key, String value) {
+    public KVMessage.StatusType put(String key, String value) {
         if (value == null) {
-            map.remove(key);
+            String prev = map.remove(key);
+            if (prev == null) {
+                return KVMessage.StatusType.DELETE_ERROR;
+            } else {
+                return KVMessage.StatusType.DELETE_SUCCESS;
+            }
         } else {
-            map.put(key, value);
+            String prev = map.put(key, value);
+            if (prev == null) {
+                return KVMessage.StatusType.PUT_SUCCESS;
+            } else {
+                return KVMessage.StatusType.PUT_UPDATE;
+            }
         }
     }
 }

@@ -1,12 +1,17 @@
 package server;
 
 import app_kvServer.IKVServer;
+import shared.messages.KVMessage;
 
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class KVStorage implements IKVStorage {
+
+    private static final String NULL_VALUE = new String();
 
     private static KVStorage current = null;
 
@@ -15,7 +20,9 @@ public class KVStorage implements IKVStorage {
     private final KeyHashStrategy keyHashStrategy;
     private final String rootPath;
 
-    private Cache<String, String> cache;
+    private final Cache<String, String> cache;
+
+    private Lock lock;
 
     /**
      * @param rootPath
@@ -43,21 +50,47 @@ public class KVStorage implements IKVStorage {
             cache = new FIFOCache<>(cacheSize);
         } else if (cacheStrategy == IKVServer.CacheStrategy.LRU) {
             cache = new LRUCache<>(cacheSize);
+        } else if (cacheStrategy == IKVServer.CacheStrategy.None) {
+            cache = new DummyCache<>();
         } else {
-            cache = null;
+            throw new IllegalArgumentException(
+                    "Unsupported cache strategy: " + cacheStrategy.toString());
         }
+
+        lock = new ReentrantLock();
     }
 
     @Override
     public String get(String key) throws IOException {
-        IKVFileStorage fileStorage = getFileStorage(key);
-        return fileStorage.read(key);
+        lock.lock();
+        try {
+            String value = cache.get(key);
+            if (value == null) {
+                IKVFileStorage fileStorage = getFileStorage(key);
+                value = fileStorage.read(key);
+
+                cache.put(key, value == null ? NULL_VALUE : value);
+            }
+            return value == NULL_VALUE ? null : value;
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
-    public void put(String key, String value) throws IOException {
-        IKVFileStorage fileStorage = getFileStorage(key);
-        fileStorage.write(key, value);
+    public KVMessage.StatusType put(String key, String value) throws
+            IOException {
+        lock.lock();
+        try {
+            IKVFileStorage fileStorage = getFileStorage(key);
+            KVMessage.StatusType response = fileStorage.write(key, value);
+
+            cache.put(key, value == null ? NULL_VALUE : value);
+
+            return response;
+        } finally {
+            lock.unlock();
+        }
     }
 
     private IKVFileStorage getFileStorage(String key) {

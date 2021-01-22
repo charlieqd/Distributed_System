@@ -1,5 +1,7 @@
 package server;
 
+import shared.messages.KVMessage;
+
 import java.io.IOException;
 
 /**
@@ -8,5 +10,5 @@ import java.io.IOException;
 public interface IKVStorage {
     String get(String key) throws IOException;
 
-    void put(String key, String value) throws IOException;
+    KVMessage.StatusType put(String key, String value) throws IOException;
 }

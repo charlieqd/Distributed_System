@@ -1,10 +1,7 @@
 package server;
 
 import org.apache.log4j.Logger;
-import shared.IProtocol;
-import shared.ISerializer;
-import shared.Request;
-import shared.Response;
+import shared.*;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 
@@ -112,10 +109,8 @@ public class ClientConnection implements Runnable {
 
         KVMessage responseMessage = null;
 
-        // TODO
-
         switch (requestMessage.getStatus()) {
-            case GET:
+            case GET: {
                 String key = requestMessage.getKey();
                 if (key == null) {
                     responseMessage = new KVMessageImpl(null, "Invalid key",
@@ -127,7 +122,8 @@ public class ClientConnection implements Runnable {
                     value = storage.get(key);
                 } catch (IOException e) {
                     responseMessage = new KVMessageImpl(null,
-                            "Internal server error",
+                            "Internal server error: " +
+                                    Util.getStackTraceString(e),
                             KVMessage.StatusType.FAILED);
                     break;
                 }
@@ -140,14 +136,40 @@ public class ClientConnection implements Runnable {
                             KVMessage.StatusType.GET_SUCCESS);
                     break;
                 }
+            }
 
-            case PUT:
+            case PUT: {
+                String key = requestMessage.getKey();
+                String value = requestMessage.getValue();
+                if (key == null) {
+                    responseMessage = new KVMessageImpl(null, "Invalid key",
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
+
+                KVMessage.StatusType putResponseType;
+                try {
+                    putResponseType = storage.put(key, value);
+                } catch (IOException e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error: " +
+                                    Util.getStackTraceString(e),
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
+
+                responseMessage = new KVMessageImpl(key, value,
+                        putResponseType);
                 break;
+            }
 
-            default:
-                sendResponse(output, request, Response.Status.BAD_REQUEST,
-                        null);
-                return;
+            default: {
+                responseMessage = new KVMessageImpl(null,
+                        "Bad request status type: " +
+                                requestMessage.getStatus().toString(),
+                        KVMessage.StatusType.FAILED);
+                break;
+            }
         }
 
         sendResponse(output, request, Response.Status.OK,

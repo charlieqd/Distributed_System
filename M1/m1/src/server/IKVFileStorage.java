@@ -1,5 +1,7 @@
 package server;
 
+import shared.messages.KVMessage;
+
 import java.io.IOException;
 
 /**
@@ -8,5 +10,6 @@ import java.io.IOException;
 public interface IKVFileStorage {
     public String read(String key) throws IOException;
 
-    public void write(String key, String value) throws IOException;
+    public KVMessage.StatusType write(String key, String value) throws
+            IOException;
 }

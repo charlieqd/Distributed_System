@@ -1,5 +1,7 @@
 package shared;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,5 +99,18 @@ public class Util {
         }
         result.add(unescapeCSVString(line.substring(start, i)));
         return result;
+    }
+
+    /**
+     * Obtain the stack trace description of the given exception as a string.
+     *
+     * @param e the exception
+     * @return the stack trace of the exception as string
+     */
+    public static String getStackTraceString(Exception e) {
+        StringWriter s = new StringWriter();
+        PrintWriter p = new PrintWriter(s);
+        e.printStackTrace(p);
+        return s.toString();
     }
 }
