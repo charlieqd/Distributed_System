@@ -1,20 +1,28 @@
 package testing;
 
-import junit.framework.TestCase;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import server.FIFOCache;
+import server.KVFileStorage;
 import server.LRUCache;
 import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-public class AdditionalTest extends TestCase {
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+public class AdditionalTest {
 
     // TODO add your test cases, at least 3
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
 
     @Test
     public void testSerialization() throws IOException, ClassNotFoundException {
@@ -104,5 +112,27 @@ public class AdditionalTest extends TestCase {
             assertEquals(expected.length, actual.size());
             assertEquals(expected[0], actual.get(0));
         }
+    }
+
+    @Test
+    public void testKVFileStorage() throws IOException {
+        File createdFile = folder.newFile("testKVFileStorage.txt");
+        KVFileStorage storage = new KVFileStorage(createdFile.getPath());
+        storage.write("address", "\ntoronto");
+        storage.write("name", "Alice, Wang");
+        storage.write("ag\\e", "20");
+        assertEquals(storage.read("address"), "\ntoronto");
+        assertEquals(storage.read("name"), "Alice, Wang");
+        assertEquals(storage.read("ag\\e"), "20");
+        storage.write("address", null);
+        assertNull(storage.read("address"));
+        storage.write("name", "Jo,e");
+        assertEquals(storage.read("name"), "Jo,e");
+        storage.write("name", null);
+        storage.write("ag\\e", null);
+        assertNull(storage.read("name"));
+        assertNull(storage.read("ag\\e"));
+        storage.write(",,,,", "//\\/\\/\\/\\/");
+        assertEquals(storage.read(",,,,"), "//\\/\\/\\/\\/");
     }
 }
