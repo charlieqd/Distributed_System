@@ -4,11 +4,13 @@ import junit.framework.TestCase;
 import org.junit.Test;
 import server.FIFOCache;
 import server.LRUCache;
+import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
+import java.util.List;
 
 public class AdditionalTest extends TestCase {
 
@@ -48,5 +50,59 @@ public class AdditionalTest extends TestCase {
         assertEquals(FIFO.get("name"), "Alice");
         assertEquals(FIFO.get("age"), "20");
 
+    }
+
+    @Test
+    public void testCSVStringEscape() {
+        {
+            String a = "abcdef", b = "abcdef";
+            assertEquals(b, Util.escapeCSVString(a));
+            assertEquals(a, Util.unescapeCSVString(b));
+        }
+        {
+            String a = "\\a,bc\ndef\r\n", b = "\\\\a\\,bc\\ndef\\r\\n";
+            assertEquals(b, Util.escapeCSVString(a));
+            assertEquals(a, Util.unescapeCSVString(b));
+        }
+        {
+            String a = "\\,,,\\na", b = "\\\\\\,\\,\\,\\\\na";
+            assertEquals(b, Util.escapeCSVString(a));
+            assertEquals(a, Util.unescapeCSVString(b));
+        }
+    }
+
+    @Test
+    public void testCSVStringSplit() {
+        {
+            String line = "a\\,b\\nc,\\\\def\\r";
+            String[] expected = new String[]{"a,b\nc", "\\def\r"};
+            List<String> actual = Util.csvSplitLine(line);
+            assertEquals(expected.length, actual.size());
+            assertEquals(expected[0], actual.get(0));
+            assertEquals(expected[1], actual.get(1));
+        }
+        {
+            String line = "abcdef";
+            String[] expected = new String[]{"abcdef"};
+            List<String> actual = Util.csvSplitLine(line);
+            assertEquals(expected.length, actual.size());
+            assertEquals(expected[0], actual.get(0));
+        }
+        {
+            String line = "ab,cdef,";
+            String[] expected = new String[]{"ab", "cdef", ""};
+            List<String> actual = Util.csvSplitLine(line);
+            assertEquals(expected.length, actual.size());
+            assertEquals(expected[0], actual.get(0));
+            assertEquals(expected[1], actual.get(1));
+            assertEquals(expected[2], actual.get(2));
+        }
+        {
+            String line = "";
+            String[] expected = new String[]{""};
+            List<String> actual = Util.csvSplitLine(line);
+            assertEquals(expected.length, actual.size());
+            assertEquals(expected[0], actual.get(0));
+        }
     }
 }

@@ -56,6 +56,9 @@ public class ClientConnection implements Runnable {
             output = clientSocket.getOutputStream();
             input = clientSocket.getInputStream();
 
+            sendResponse(output, null, Response.Status.CONNECTION_ESTABLISHED,
+                    null);
+
             while (isOpen) {
                 try {
                     Request request = receiveRequest(input);
@@ -106,7 +109,7 @@ public class ClientConnection implements Runnable {
      * @param output  the output stream to write response to.
      * @param request the client request this response corresponds to.
      * @param status  the status of the response.
-     * @param message the message that is to be sent.
+     * @param message the message that is to be sent; can be null.
      * @throws IOException some I/O error regarding the output stream
      */
     public void sendResponse(OutputStream output,

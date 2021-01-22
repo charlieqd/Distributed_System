@@ -5,7 +5,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * NOTE: Protocol methods must be thread-safe.
+ * NOTE: - Protocol methods must be thread-safe. - Each ID must be
+ * non-negative.
  */
 public interface IProtocol {
     // For server
@@ -22,5 +23,5 @@ public interface IProtocol {
     void writeRequest(OutputStream output, int id, byte[] encodedMessage)
             throws IOException;
 
-    Response readResponse(InputStream input, byte[] data) throws IOException;
+    Response readResponse(InputStream input) throws IOException;
 }
