@@ -135,16 +135,16 @@ public class KVClient implements IKVClient, ClientSocketListener {
     private void putData(String key, String value) throws Exception {
         try {
             KVMessage msgBack = kvclient.put(key, value);
-            KVMessage.StatusType status = msgBack.getStatus();
-            if (status == KVMessage.StatusType.PUT_ERROR) {
-                printError("Put Error!");
-            } else if (status == KVMessage.StatusType.PUT_SUCCESS) {
-                System.out.println("Put Data Success!");
-            } else if (status == KVMessage.StatusType.PUT_UPDATE) {
-                System.out.println("Put Update Success!");
-            } else {
-                printError("Unexpected Response Type From Put Request!");
-            }
+//            KVMessage.StatusType status = msgBack.getStatus();
+//            if (status == KVMessage.StatusType.PUT_ERROR) {
+//                printError("Put Error!");
+//            } else if (status == KVMessage.StatusType.PUT_SUCCESS) {
+//                System.out.println("Put Data Success!");
+//            } else if (status == KVMessage.StatusType.PUT_UPDATE) {
+//                System.out.println("Put Update Success!");
+//            } else {
+//                printError("Unexpected Response Type From Put Request!");
+//            }
         } catch (IOException e) {
             printError("Unable to send put request!");
             newDisconnection();
@@ -154,16 +154,16 @@ public class KVClient implements IKVClient, ClientSocketListener {
     private void getData(String key) throws Exception {
         try {
             KVMessage msgBack = kvclient.get(key);
-            KVMessage.StatusType status = msgBack.getStatus();
-            String value = msgBack.getValue();
-            if (status == KVMessage.StatusType.GET_ERROR) {
-                printError("Get Error!");
-            } else if (status == KVMessage.StatusType.GET_SUCCESS) {
-                System.out.println("Get Data Success!");
-                System.out.println(value);
-            } else {
-                printError("Unexpected Response Type From GET Request!");
-            }
+//            KVMessage.StatusType status = msgBack.getStatus();
+//            String value = msgBack.getValue();
+//            if (status == KVMessage.StatusType.GET_ERROR) {
+//                printError("Get Error!");
+//            } else if (status == KVMessage.StatusType.GET_SUCCESS) {
+//                System.out.println("Get Data Success!");
+//                System.out.println(value);
+//            } else {
+//                printError("Unexpected Response Type From GET Request!");
+//            }
         } catch (IOException e) {
             printError("Unable to send GET request!");
             newDisconnection();
@@ -181,8 +181,12 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
     private void newDisconnection() {
         if (kvclient != null) {
-            kvclient.disconnect();
-            kvclient = null;
+            try {
+                kvclient.disconnect();
+                kvclient = null;
+            } catch (Exception e) {
+                printError("No connection to close");
+            }
         }
     }
 
@@ -252,7 +256,13 @@ public class KVClient implements IKVClient, ClientSocketListener {
             String status = msg.getStatus().name();
             String key = msg.getKey();
             String value = msg.getValue();
-            System.out.println(status + " " + key + " " + value);
+            if (status.equals("GET_ERROR")) {
+                System.out.println(status + "<" + key + ">");
+            } else if (status.equals("FAILED")) {
+                System.out.println(status + "<" + value + ">");
+            } else {
+                System.out.println(status + "<" + key + "," + value + ">");
+            }
             System.out.print(PROMPT);
         }
     }

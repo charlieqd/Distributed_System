@@ -49,6 +49,7 @@ public class KVStore implements KVCommInterface {
         serverPort = port;
         nextId = 0;
         idToResponse = new Hashtable<Integer, Response>();
+        listeners = new HashSet<ClientSocketListener>();
         serializer = new KVMessageSerializer();
         protocol = new Protocol();
     }
@@ -163,32 +164,31 @@ public class KVStore implements KVCommInterface {
         clientSocket = new Socket(serverAddress, serverPort);
         output = clientSocket.getOutputStream();
         input = clientSocket.getInputStream();
-        listeners = new HashSet<ClientSocketListener>();
         setRunning(true);
-        while (running) {
-            try {
-                Response res = protocol.readResponse(input);
-                int status = res.getStatus();
-                if (status == Response.Status.CONNECTION_ESTABLISHED) {
-                    logger.info("Connection Established!");
-                } else {
-                    logger.error("Connection Error!");
-                }
-            } catch (IOException ioe) {
-                if (isRunning()) {
-                    logger.error("Connection lost!");
-                    try {
-                        tearDownConnection();
-                        for (ClientSocketListener listener : listeners) {
-                            listener.handleStatus(
-                                    ClientSocketListener.SocketStatus.CONNECTION_LOST);
-                        }
-                    } catch (IOException e) {
-                        logger.error("Unable to close connection!");
+
+        try {
+            Response res = protocol.readResponse(input);
+            int status = res.getStatus();
+            if (status == Response.Status.CONNECTION_ESTABLISHED) {
+                logger.info("Connection Established!");
+            } else {
+                logger.error("Connection Error!");
+            }
+        } catch (IOException ioe) {
+            if (isRunning()) {
+                logger.error("Connection lost!");
+                try {
+                    tearDownConnection();
+                    for (ClientSocketListener listener : listeners) {
+                        listener.handleStatus(
+                                ClientSocketListener.SocketStatus.CONNECTION_LOST);
                     }
+                } catch (IOException e) {
+                    logger.error("Unable to close connection!");
                 }
             }
         }
+
     }
 
     @Override
@@ -198,10 +198,15 @@ public class KVStore implements KVCommInterface {
 
         try {
             tearDownConnection();
-            for (ClientSocketListener listener : listeners) {
-                listener.handleStatus(
-                        ClientSocketListener.SocketStatus.DISCONNECTED);
+            try {
+                for (ClientSocketListener listener : listeners) {
+                    listener.handleStatus(
+                            ClientSocketListener.SocketStatus.DISCONNECTED);
+                }
+            } catch (Exception e) {
+                logger.error("No connection to close!");
             }
+
         } catch (IOException ioe) {
             logger.error("Unable to close connection!");
         }
