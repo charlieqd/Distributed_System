@@ -12,6 +12,7 @@ import shared.messages.KVMessage;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.UnknownHostException;
 
@@ -19,6 +20,7 @@ public class KVClient implements IKVClient, KVStoreListener {
 
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "KVClient> ";
+    private final InputStream input;
     private BufferedReader stdin;
     private KVStore kvStore = null;
     private boolean stop = false;
@@ -26,8 +28,12 @@ public class KVClient implements IKVClient, KVStoreListener {
     private String serverAddress;
     private int serverPort;
 
+    public KVClient(InputStream inputStream) {
+        this.input = inputStream;
+    }
+
     public void run() throws Exception {
-        stdin = new BufferedReader(new InputStreamReader(System.in));
+        stdin = new BufferedReader(new InputStreamReader(this.input));
         while (!stop) {
             System.out.print(PROMPT);
 
@@ -329,7 +335,7 @@ public class KVClient implements IKVClient, KVStoreListener {
     public static void main(String[] args) throws Exception {
         try {
             new LogSetup("logs/client.log", Level.OFF);
-            KVClient app = new KVClient();
+            KVClient app = new KVClient(System.in);
             app.run();
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");

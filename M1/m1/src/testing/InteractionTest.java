@@ -106,6 +106,24 @@ public class InteractionTest {
     }
 
     @Test
+    public void testIllegalDelete() {
+        String key = "notExistingKey";
+
+        KVMessage response = null;
+        Exception ex = null;
+
+        try {
+            response = kvClient.put(key, null);
+
+        } catch (Exception e) {
+            ex = e;
+        }
+
+        assertTrue(ex == null && response
+                .getStatus() == StatusType.DELETE_ERROR);
+    }
+
+    @Test
     public void testGet() {
         String key = "foo";
         String value = "bar";
@@ -150,6 +168,23 @@ public class InteractionTest {
         }
 
         assertNotNull(ex);
+    }
+
+    @Test
+    public void testPutDeleteGet() {
+        String key = "KV_Test";
+        String value = "bar";
+        KVMessage response = null;
+        Exception ex = null;
+
+        try {
+            kvClient.put(key, value);
+            response = kvClient.get(key);
+        } catch (Exception e) {
+            ex = e;
+        }
+
+        assertTrue(ex == null && response.getValue().equals("bar"));
     }
 
 
