@@ -1,35 +1,39 @@
 package testing;
 
+import app_kvServer.IKVServer;
 import app_kvServer.KVServer;
-import junit.framework.Test;
-import junit.framework.TestSuite;
 import logger.LogSetup;
 import org.apache.log4j.Level;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Suite;
+import server.KVStorage;
+import server.MD5PrefixKeyHashStrategy;
 import shared.Protocol;
 import shared.messages.KVMessageSerializer;
 
-import java.io.IOException;
 
-
+@RunWith(Suite.class)
+@Suite.SuiteClasses({ConnectionTest.class, InteractionTest.class, AdditionalTest.class})
 public class AllTests {
 
-    static {
+    @ClassRule
+    public static TemporaryFolder folder = new TemporaryFolder();
+
+    @BeforeClass
+    public static void setUp() {
         try {
+            String rootPath = folder.newFolder("data").toString();
             new LogSetup("logs/testing/test.log", Level.ERROR);
-            new KVServer(new FakeKVStorage(), new Protocol(),
-                    new KVMessageSerializer(), 5000);
-        } catch (IOException e) {
+            new KVServer(
+                    new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+                            1024, IKVServer.CacheStrategy.FIFO), new Protocol(),
+                    new KVMessageSerializer(), 50000);
+        } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-
-    public static Test suite() {
-        TestSuite clientSuite = new TestSuite("Basic Storage ServerTest-Suite");
-        clientSuite.addTestSuite(ConnectionTest.class);
-        clientSuite.addTestSuite(InteractionTest.class);
-        // clientSuite.addTestSuite(AdditionalTest.class);
-        return clientSuite;
     }
 
 }

@@ -1,15 +1,18 @@
 package testing;
 
 import client.KVStore;
-import junit.framework.TestCase;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
 
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-public class ConnectionTest extends TestCase {
 
+public class ConnectionTest {
 
+    @Test
     public void testConnectionSuccess() throws IOException {
 
         Exception ex = null;
@@ -24,7 +27,7 @@ public class ConnectionTest extends TestCase {
         assertNull(ex);
     }
 
-
+    @Test
     public void testUnknownHost() throws IOException {
         Exception ex = null;
         KVStore kvClient = new KVStore("unknown", 50000);
@@ -38,7 +41,7 @@ public class ConnectionTest extends TestCase {
         assertTrue(ex instanceof UnknownHostException);
     }
 
-
+    @Test
     public void testIllegalPort() throws IOException {
         Exception ex = null;
         KVStore kvClient = new KVStore("localhost", 123456789);
