@@ -1,18 +1,23 @@
 package testing;
 
 import client.KVStore;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import shared.messages.KVMessage;
 import shared.messages.KVMessage.StatusType;
 
 import java.io.IOException;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-public class InteractionTest extends TestCase {
+
+public class InteractionTest {
 
     private KVStore kvClient;
 
+    @Before
     public void setUp() throws IOException {
         kvClient = new KVStore("localhost", 50000);
         try {
@@ -21,10 +26,10 @@ public class InteractionTest extends TestCase {
         }
     }
 
+    @After
     public void tearDown() {
         kvClient.disconnect();
     }
-
 
     @Test
     public void testPut() {
@@ -90,7 +95,7 @@ public class InteractionTest extends TestCase {
 
         try {
             kvClient.put(key, value);
-            response = kvClient.put(key, "null");
+            response = kvClient.put(key, null);
 
         } catch (Exception e) {
             ex = e;
