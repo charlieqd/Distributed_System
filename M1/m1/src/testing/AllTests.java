@@ -30,7 +30,7 @@ public class AllTests {
             new KVServer(
                     new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
                             1024, IKVServer.CacheStrategy.FIFO), new Protocol(),
-                    new KVMessageSerializer(), 50000);
+                    new KVMessageSerializer(), 50000).start();
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -113,41 +113,40 @@ public class KVStore implements KVCommInterface {
     }
 
     private KVMessage receiveMessage(int requestID) throws Exception {
-        try {
-            while (true) {
-                Response res = watcherQueue
-                        .poll(SOCKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                if (res == null) {
-                    return new KVMessageImpl(null, "Reqeust timed out.",
-                            KVMessage.StatusType.FAILED);
-                }
-
-                int status = res.getStatus();
-                if (status == Response.Status.OK) {
-                    byte[] msgByte = res.getBody();
-                    int id = res.getId();
-                    if (id != requestID) {
-                        // Skip old timed-out responses
-                        continue;
-                    }
-
-                    KVMessage message = serializer.decode(msgByte);
-                    return message;
-                } else if (status == Response.Status.DISCONNECTED) {
-                    return new KVMessageImpl(null,
-                            "Request failed: disconnected.",
-                            KVMessage.StatusType.FAILED);
-                } else {
-                    return new KVMessageImpl(null,
-                            "Incorrect response status: " +
-                                    Integer.toString(status),
-                            KVMessage.StatusType.FAILED);
-                }
+        while (true) {
+            Response res = watcherQueue
+                    .poll(SOCKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (res == null) {
+                return new KVMessageImpl(null, "Reqeust timed out.",
+                        KVMessage.StatusType.FAILED);
             }
-        } catch (IOException ioe) {
-            logger.error("Command cannot be executed! Disconnected!");
-            disconnect();
-            throw ioe;
+
+            int status = res.getStatus();
+            if (status == Response.Status.OK) {
+                byte[] msgByte = res.getBody();
+                int id = res.getId();
+                if (id != requestID) {
+                    // Skip old timed-out responses
+                    continue;
+                }
+
+                try {
+                    return serializer.decode(msgByte);
+                } catch (Exception e) {
+                    return new KVMessageImpl(null,
+                            "Failed to decode message",
+                            KVMessage.StatusType.FAILED);
+                }
+            } else if (status == Response.Status.DISCONNECTED) {
+                return new KVMessageImpl(null,
+                        "Request failed: disconnected.",
+                        KVMessage.StatusType.FAILED);
+            } else {
+                return new KVMessageImpl(null,
+                        "Incorrect response status: " +
+                                Integer.toString(status),
+                        KVMessage.StatusType.FAILED);
+            }
         }
     }
 
@@ -158,7 +157,14 @@ public class KVStore implements KVCommInterface {
                             KVMessage.StatusType status) throws IOException {
         try {
             KVMessage kvMsg = new KVMessageImpl(key, value, status);
-            byte[] msgBytes = serializer.encode(kvMsg);
+            byte[] msgBytes;
+            try {
+                msgBytes = serializer.encode(kvMsg);
+            } catch (Exception e) {
+                logger.error("Failed to serialize message: " + Util
+                        .getStackTraceString(e));
+                return -1;
+            }
             int id = nextId;
             protocol.writeRequest(output, nextId, msgBytes);
             nextId += 1;
@@ -166,16 +172,15 @@ public class KVStore implements KVCommInterface {
         } catch (IOException e) {
             logger.error("Unable to send message! Disconnected!");
             disconnect();
-            return -1;
+            throw e;
         }
     }
 
 
     @Override
-    public boolean connect() throws Exception {
+    public void connect() throws Exception {
         if (running) {
-            logger.error("Already connected");
-            return false;
+            throw new IllegalStateException("Already connected");
         }
 
         try {
@@ -187,7 +192,7 @@ public class KVStore implements KVCommInterface {
             clientSocket = null;
             output = null;
             input = null;
-            return false;
+            throw e;
         }
 
         running = true;
@@ -200,12 +205,13 @@ public class KVStore implements KVCommInterface {
             } else {
                 logger.error("Connection Error!");
                 disconnect();
-                return false;
+                throw new IllegalStateException(
+                        "Connection error: server did not acknowledge connection");
             }
         } catch (IOException ioe) {
             logger.error("Connection lost!");
             disconnect();
-            return false;
+            throw ioe;
         }
 
         connectionTerminated.set(false);
@@ -213,14 +219,11 @@ public class KVStore implements KVCommInterface {
         watcher = new Thread(
                 new SocketWatcher(protocol, this, input, watcherQueue));
         watcher.start();
-
-        return true;
     }
 
     @Override
     public void disconnect() {
         if (!running) {
-            logger.error("Already disconnected");
             return;
         }
 
