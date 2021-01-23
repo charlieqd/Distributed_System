@@ -132,5 +132,20 @@ public class InteractionTest extends TestCase {
         assertTrue(ex == null && response.getStatus() == StatusType.GET_ERROR);
     }
 
+    @Test
+    public void testGetDisconnect() {
+        kvClient.disconnect();
+        String key = "KV_Test";
+        Exception ex = null;
+
+        try {
+            kvClient.get(key);
+        } catch (Exception e) {
+            ex = e;
+        }
+
+        assertNotNull(ex);
+    }
+
 
 }
