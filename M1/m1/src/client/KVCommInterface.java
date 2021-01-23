@@ -11,10 +11,9 @@ public interface KVCommInterface {
      * Establishes a connection to the KV Server. If connection failed, will
      * disconnect automatically.
      *
-     * @return if connection is successful.
      * @throws Exception if connection could not be established.
      */
-    public boolean connect() throws Exception;
+    public void connect() throws Exception;
 
     /**
      * disconnects the client from the currently connected server.

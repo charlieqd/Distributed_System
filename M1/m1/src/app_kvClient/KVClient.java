@@ -8,6 +8,7 @@ import client.KVStoreListener;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import shared.Util;
 import shared.messages.KVMessage;
 
 import java.io.BufferedReader;
@@ -181,13 +182,13 @@ public class KVClient implements IKVClient, KVStoreListener {
     public void connect(String address, int port) throws Exception {
         if (kvStore == null) {
             kvStore = new KVStore(address, port);
-            boolean connectionSuccessful = kvStore.connect();
-            if (connectionSuccessful) {
-                System.out.println("Connection established.");
+            try {
+                kvStore.connect();
                 kvStore.addListener(this);
-            } else { // Connection failed
+                System.out.println("Connection established.");
+            } catch (Exception e) {
                 kvStore = null;
-                printError("Connection failed.");
+                printError("Connection failed: " + Util.getStackTraceString(e));
             }
         }
     }
