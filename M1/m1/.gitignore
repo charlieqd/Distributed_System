@@ -5,3 +5,4 @@ out/
 /*.iml
 /*.MF
 .DS_Store
+data/

@@ -3,6 +3,7 @@ package server;
 import app_kvServer.IKVServer;
 import shared.messages.KVMessage;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,9 +38,15 @@ public class KVStorage implements IKVStorage {
     public KVStorage(String rootPath, KeyHashStrategy keyHashStrategy,
                      int cacheSize, IKVServer.CacheStrategy cacheStrategy) {
         this.rootPath = rootPath;
-        if (current == null) {
+        if (current != null) {
             throw new IllegalStateException(
                     "Cannot have more than one KVStorage instance");
+        }
+
+        // Make directories
+        File file = new File(this.rootPath);
+        if (!file.exists()) {
+            file.mkdirs();
         }
 
         this.keyHashStrategy = keyHashStrategy;

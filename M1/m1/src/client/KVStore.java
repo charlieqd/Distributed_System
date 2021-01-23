@@ -1,8 +1,10 @@
 package client;
 
 import org.apache.log4j.Logger;
+import shared.IProtocol;
 import shared.Protocol;
 import shared.Response;
+import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
@@ -13,10 +15,56 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class KVStore implements KVCommInterface {
+
+    private static class SocketWatcher implements Runnable {
+        private Logger logger = Logger.getRootLogger();
+
+        private IProtocol protocol;
+        private KVStore store;
+        private InputStream socketInput;
+        private BlockingQueue<Response> queue;
+
+        public SocketWatcher(IProtocol protocol,
+                             KVStore store,
+                             InputStream socketInput,
+                             BlockingQueue<Response> queue) {
+            this.protocol = protocol;
+            this.store = store;
+            this.socketInput = socketInput;
+            this.queue = queue;
+        }
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    Response res = protocol.readResponse(socketInput);
+                    queue.put(res);
+                } catch (IOException | InterruptedException e) {
+                    logger.info("Socket closed.");
+                    try {
+                        queue.put(new Response(new byte[0], -1,
+                                Response.Status.DISCONNECTED));
+                    } catch (InterruptedException interruptedException) {
+                        logger.error(
+                                Util.getStackTraceString(interruptedException));
+                    }
+                    store.connectionTerminated.set(true);
+                    store.notifyStatusChange(
+                            KVStoreListener.SocketStatus.DISCONNECTED);
+                    break;
+                }
+            }
+        }
+    }
+
     /**
      * Initialize KVStore with address and port of KVServer
      *
@@ -25,7 +73,7 @@ public class KVStore implements KVCommInterface {
      */
 
     private Logger logger = Logger.getRootLogger();
-    private Set<ClientSocketListener> listeners;
+    private final Set<KVStoreListener> listeners;
     private boolean running;
 
     private Socket clientSocket;
@@ -34,13 +82,18 @@ public class KVStore implements KVCommInterface {
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
+    private static final int SOCKET_TIMEOUT_SECONDS = 30;
     private String serverAddress;
     private int serverPort;
     private int nextId;
-    private Hashtable<Integer, Response> idToResponse;
 
     private KVMessageSerializer serializer;
     private Protocol protocol;
+
+    private BlockingQueue<Response> watcherQueue;
+
+    private Thread watcher = null;
+    private final AtomicBoolean connectionTerminated;
 
 
     public KVStore(String address, int port) throws IOException {
@@ -48,123 +101,96 @@ public class KVStore implements KVCommInterface {
         serverAddress = address;
         serverPort = port;
         nextId = 0;
-        idToResponse = new Hashtable<Integer, Response>();
-        listeners = new HashSet<ClientSocketListener>();
+        listeners = new HashSet<KVStoreListener>();
         serializer = new KVMessageSerializer();
         protocol = new Protocol();
+        watcherQueue = new LinkedBlockingQueue<>();
+        connectionTerminated = new AtomicBoolean();
     }
 
-    private void setRunning(boolean run) {
-        running = run;
+    public boolean isConnectionValid() {
+        return running && !connectionTerminated.get();
     }
 
-//    public void run() {
-//        try {
-//            output = clientSocket.getOutputStream();
-//            input = clientSocket.getInputStream();
-//
-//            while (isRunning()) {
-//                try {
-//                    Response res = protocol.readResponse(input);
-//                    for (ClientSocketListener listener : listeners) {
-//                        listener.handleNewMessage(latestMsg);
-//                    }
-//                } catch (IOException ioe) {
-//                    if (isRunning()) {
-//                        logger.error("Connection lost!");
-//                        try {
-//                            tearDownConnection();
-//                            for (ClientSocketListener listener : listeners) {
-//                                listener.handleStatus(
-//                                        ClientSocketListener.SocketStatus.CONNECTION_LOST);
-//                            }
-//                        } catch (IOException e) {
-//                            logger.error("Unable to close connection!");
-//                        }
-//                    }
-//                }
-//            }
-//        } catch (IOException ioe) {
-//            logger.error("Connection could not be established!");
-//
-//        } finally {
-//            if (isRunning()) {
-//                disconnect();
-//            }
-//        }
-//    }
-
-    private void tearDownConnection() throws IOException {
-        setRunning(false);
-        logger.info("tearing down the connection ...");
-        if (clientSocket != null) {
-            clientSocket.close();
-            clientSocket = null;
-            logger.info("connection closed!");
-        }
-    }
-
-    public boolean isRunning() {
-        return running;
-    }
-
-    private KVMessage receiveMessage() throws Exception {
+    private KVMessage receiveMessage(int requestID) throws Exception {
         try {
-            Response res = protocol.readResponse(input);
-            int status = res.getStatus();
-            if (status == Response.Status.OK) {
-                byte[] msgByte = res.getBody();
-                int id = res.getId();
-                idToResponse.put(id, res);
-                KVMessage latestMsg = serializer.decode(msgByte);
-                for (ClientSocketListener listener : listeners) {
-                    listener.handleNewMessage(latestMsg);
+            while (true) {
+                Response res = watcherQueue
+                        .poll(SOCKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                if (res == null) {
+                    return new KVMessageImpl(null, "Reqeust timed out.",
+                            KVMessage.StatusType.FAILED);
                 }
-                return latestMsg;
-            } else {
-                throw new Exception("Incorrect Status!");
+
+                int status = res.getStatus();
+                if (status == Response.Status.OK) {
+                    byte[] msgByte = res.getBody();
+                    int id = res.getId();
+                    if (id != requestID) {
+                        // Skip old timed-out responses
+                        continue;
+                    }
+
+                    KVMessage message = serializer.decode(msgByte);
+                    return message;
+                } else if (status == Response.Status.DISCONNECTED) {
+                    return new KVMessageImpl(null,
+                            "Request failed: disconnected.",
+                            KVMessage.StatusType.FAILED);
+                } else {
+                    return new KVMessageImpl(null,
+                            "Incorrect response status: " +
+                                    Integer.toString(status),
+                            KVMessage.StatusType.FAILED);
+                }
             }
         } catch (IOException ioe) {
-            if (isRunning()) {
-                logger.error(
-                        "Command cannot be executed! Connection lost!");
-                try {
-                    tearDownConnection();
-                    for (ClientSocketListener listener : listeners) {
-                        listener.handleStatus(
-                                ClientSocketListener.SocketStatus.CONNECTION_LOST);
-                    }
-                } catch (IOException e) {
-                    logger.error("Unable to close connection!");
-                }
-            }
-            throw new Exception("Command cannot be executed!");
+            logger.error("Command cannot be executed! Disconnected!");
+            disconnect();
+            throw ioe;
         }
     }
 
-    private void sendRequest(String key, String value,
-                             KVMessage.StatusType status) throws
-            IOException {
+    /**
+     * Return the ID of the request sent. If request failed to send, return -1.
+     */
+    private int sendRequest(String key, String value,
+                            KVMessage.StatusType status) throws IOException {
         try {
             KVMessage kvMsg = new KVMessageImpl(key, value, status);
             byte[] msgBytes = serializer.encode(kvMsg);
+            int id = nextId;
             protocol.writeRequest(output, nextId, msgBytes);
-            idToResponse.put(nextId, null);
             nextId += 1;
+            return id;
         } catch (IOException e) {
-            logger.error("Unable to send message!");
+            logger.error("Unable to send message! Disconnected!");
             disconnect();
+            return -1;
         }
     }
 
 
     @Override
-    public void connect() throws Exception {
-        // TODO Auto-generated method stub
-        clientSocket = new Socket(serverAddress, serverPort);
-        output = clientSocket.getOutputStream();
-        input = clientSocket.getInputStream();
-        setRunning(true);
+    public boolean connect() throws Exception {
+        if (running) {
+            logger.error("Already connected");
+            return false;
+        }
+
+        try {
+            clientSocket = new Socket(serverAddress, serverPort);
+            output = clientSocket.getOutputStream();
+            input = clientSocket.getInputStream();
+        } catch (Exception e) {
+            logger.warn("Socket creation failed", e);
+            clientSocket = null;
+            output = null;
+            input = null;
+            return false;
+        }
+
+        running = true;
 
         try {
             Response res = protocol.readResponse(input);
@@ -173,40 +199,49 @@ public class KVStore implements KVCommInterface {
                 logger.info("Connection Established!");
             } else {
                 logger.error("Connection Error!");
+                disconnect();
+                return false;
             }
         } catch (IOException ioe) {
-            if (isRunning()) {
-                logger.error("Connection lost!");
-                try {
-                    tearDownConnection();
-                    for (ClientSocketListener listener : listeners) {
-                        listener.handleStatus(
-                                ClientSocketListener.SocketStatus.CONNECTION_LOST);
-                    }
-                } catch (IOException e) {
-                    logger.error("Unable to close connection!");
-                }
-            }
+            logger.error("Connection lost!");
+            disconnect();
+            return false;
         }
 
+        connectionTerminated.set(false);
+        watcherQueue.clear();
+        watcher = new Thread(
+                new SocketWatcher(protocol, this, input, watcherQueue));
+        watcher.start();
+
+        return true;
     }
 
     @Override
     public void disconnect() {
-        // TODO Auto-generated method stub
-        logger.info("try to close connection ...");
+        if (!running) {
+            logger.error("Already disconnected");
+            return;
+        }
+
+        logger.info("trying to close connection ...");
 
         try {
-            tearDownConnection();
-            try {
-                for (ClientSocketListener listener : listeners) {
-                    listener.handleStatus(
-                            ClientSocketListener.SocketStatus.DISCONNECTED);
+            running = false;
+            logger.info("tearing down the connection ...");
+            if (clientSocket != null) {
+                clientSocket.close();
+                clientSocket = null;
+                try {
+                    watcher.join();
+                } catch (InterruptedException e) {
+                    logger.error(Util.getStackTraceString(e));
                 }
-            } catch (Exception e) {
-                logger.error("No connection to close!");
+                connectionTerminated.set(false);
+                watcher = null;
+                watcherQueue.clear();
+                logger.info("connection closed!");
             }
-
         } catch (IOException ioe) {
             logger.error("Unable to close connection!");
         }
@@ -214,26 +249,43 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public KVMessage put(String key, String value) throws Exception {
-        // TODO Auto-generated method stub
-        sendRequest(key, value, KVMessage.StatusType.PUT);
-        /*Returns: a message that confirms the insertion of the tuple or an error.
-        Throws: Exception – if put command cannot be executed (e.g. not connected to any KV server).*/
-        return receiveMessage();
+        int id = sendRequest(key, value, KVMessage.StatusType.PUT);
+        if (id < 0) {
+            return new KVMessageImpl(null, "Failed to send request.",
+                    KVMessage.StatusType.FAILED);
+        }
+        return receiveMessage(id);
     }
 
     @Override
     public KVMessage get(String key) throws Exception {
-        // TODO Auto-generated method stub
-        sendRequest(key, null, KVMessage.StatusType.GET);
-        /*Returns: the value, which is indexed by the given key.
-        Throws: Exception – if get command cannot be executed (e.g. not connected to any KV server).*/
-        return receiveMessage();
+        int id = sendRequest(key, null, KVMessage.StatusType.GET);
+        if (id < 0) {
+            return new KVMessageImpl(null, "Failed to send request.",
+                    KVMessage.StatusType.FAILED);
+        }
+        return receiveMessage(id);
     }
 
-    public void addListener(ClientSocketListener listener) {
-        listeners.add(listener);
+    public void addListener(KVStoreListener listener) {
+        synchronized (listeners) {
+            listeners.add(listener);
+        }
     }
 
+    public void removeListener(KVStoreListener listener) {
+        synchronized (listeners) {
+            listeners.remove(listener);
+        }
+    }
+
+    private void notifyStatusChange(KVStoreListener.SocketStatus status) {
+        synchronized (listeners) {
+            for (KVStoreListener listener : listeners) {
+                listener.handleStatusChange(status);
+            }
+        }
+    }
 
     public void sendMessage(TextMessage msg) throws IOException {
         byte[] msgBytes = msg.getMsgBytes();

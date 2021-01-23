@@ -3,6 +3,7 @@ package server;
 import shared.Util;
 import shared.messages.KVMessage;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.List;
@@ -16,6 +17,8 @@ public class KVFileStorage implements IKVFileStorage {
     }
 
     public String read(String key) throws IOException {
+        if (!new File(filename).exists()) return null;
+
         try (RandomAccessFile reader = new RandomAccessFile(filename,
                 "r")) {
             String line = reader.readLine();

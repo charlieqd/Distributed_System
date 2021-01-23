@@ -121,7 +121,7 @@ public class KVServer extends Thread implements IKVServer {
     public static void main(String[] args) {
         try {
             // TODO implement path and other params
-            String rootPath = "TODO";
+            String rootPath = "data";
             int cacheSize = DEFAULT_CACHE_SIZE;
             CacheStrategy cacheStrategy = DEFAULT_CACHE_STRATEGY;
 

@@ -69,12 +69,11 @@ public class ClientConnection implements Runnable {
 
                     KVMessage requestMessage = readMessage(request);
                     if (requestMessage == null) {
-                        sendResponse(output, request,
-                                Response.Status.BAD_REQUEST, null);
+                        sendResponse(output, request, Response.Status.OK,
+                                new KVMessageImpl(null, "Invalid message",
+                                        KVMessage.StatusType.FAILED));
                         continue;
                     }
-
-                    // TODO bad request if key is null
 
                     handleMessage(output, request, requestMessage);
 

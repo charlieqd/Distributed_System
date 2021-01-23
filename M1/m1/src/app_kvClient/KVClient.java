@@ -2,9 +2,9 @@ package app_kvClient;
 
 //import client.Client;
 
-import client.ClientSocketListener;
 import client.KVCommInterface;
 import client.KVStore;
+import client.KVStoreListener;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -15,20 +15,20 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.UnknownHostException;
 
-public class KVClient implements IKVClient, ClientSocketListener {
+public class KVClient implements IKVClient, KVStoreListener {
 
     private static Logger logger = Logger.getRootLogger();
-    private static final String PROMPT = "419Client> ";
+    private static final String PROMPT = "KVClient> ";
     private BufferedReader stdin;
-    private KVStore kvclient = null;
+    private KVStore kvStore = null;
     private boolean stop = false;
 
     private String serverAddress;
     private int serverPort;
 
     public void run() throws Exception {
+        stdin = new BufferedReader(new InputStreamReader(System.in));
         while (!stop) {
-            stdin = new BufferedReader(new InputStreamReader(System.in));
             System.out.print(PROMPT);
 
             try {
@@ -38,6 +38,8 @@ public class KVClient implements IKVClient, ClientSocketListener {
                 stop = true;
                 printError("CLI does not respond - Application terminated ");
             }
+
+            System.out.println("");
         }
     }
 
@@ -57,41 +59,49 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
         if (tokens[0].equals("quit")) {
             stop = true;
-            newDisconnection();
-            System.out.println(PROMPT + "Application exit!");
+            disconnect();
+            System.out.println("Application exit!");
 
         } else if (tokens[0].equals("connect")) {
-            if (tokens.length == 3) {
-                try {
-                    serverAddress = tokens[1];
-                    serverPort = Integer.parseInt(tokens[2]);
-                    newConnection(serverAddress, serverPort);
-                } catch (NumberFormatException nfe) {
-                    printError("No valid address. Port must be a number!");
-                    logger.info("Unable to parse argument <port>", nfe);
-                } catch (UnknownHostException e) {
-                    printError("Unknown Host!");
-                    logger.info("Unknown Host!", e);
-                } catch (IOException e) {
-                    printError("Could not establish connection!");
-                    logger.warn("Could not establish connection!", e);
-                }
+            if (connectionValid()) {
+                printError("Already connected!");
             } else {
-                printError("Invalid number of parameters!");
+                if (tokens.length == 3) {
+                    try {
+                        serverAddress = tokens[1];
+                        serverPort = Integer.parseInt(tokens[2]);
+                        disconnect();
+                        connect(serverAddress, serverPort);
+                    } catch (NumberFormatException nfe) {
+                        printError("No valid address. Port must be a number!");
+                        logger.info("Unable to parse argument <port>", nfe);
+                    } catch (UnknownHostException e) {
+                        printError("Unknown Host!");
+                        logger.info("Unknown Host!", e);
+                    } catch (IOException e) {
+                        printError("Could not establish connection!");
+                        logger.warn("Could not establish connection!", e);
+                    }
+                } else {
+                    printError("Invalid number of parameters!");
+                }
             }
 
         } else if (tokens[0].equals("disconnect")) {
-            newDisconnection();
+            if (kvStore != null) {
+                disconnect();
+            } else {
+                printError("No connection to close");
+            }
 
         } else if (tokens[0].equals("logLevel")) {
             if (tokens.length == 2) {
-                String level = setLevel(tokens[1]);
+                String level = setLogLevel(tokens[1]);
                 if (level.equals(LogSetup.UNKNOWN_LEVEL)) {
                     printError("No valid log level!");
                     printPossibleLogLevels();
                 } else {
-                    System.out.println(PROMPT +
-                            "Log level changed to level " + level);
+                    System.out.println("Log level changed to level " + level);
                 }
             } else {
                 printError("Invalid number of parameters!");
@@ -99,13 +109,24 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
         } else if (tokens[0].equals("put")) {
             if (tokens.length == 3) {
-                if (kvclient != null && kvclient.isRunning()) {
-//                    String msg = tokenToString(tokens);
+                if (connectionValid()) {
                     String key = tokens[1];
                     String value = tokens[2];
                     putData(key, value);
                 } else {
-                    printError("Not connected!");
+                    printError("Not connected or connection stopped!");
+                }
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
+        } else if (tokens[0].equals("delete")) {
+            if (tokens.length == 2) {
+                if (connectionValid()) {
+                    String key = tokens[1];
+                    putData(key, null);
+                } else {
+                    printError("Not connected or connection stopped!");
                 }
             } else {
                 printError("Invalid number of parameters!");
@@ -113,12 +134,11 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
         } else if (tokens[0].equals("get")) {
             if (tokens.length == 2) {
-                if (kvclient != null && kvclient.isRunning()) {
-//                    String msg = tokenToString(tokens);
+                if (connectionValid()) {
                     String key = tokens[1];
                     getData(key);
                 } else {
-                    printError("Not connected!");
+                    printError("Not connected or connection stopped!");
                 }
 
             } else {
@@ -134,95 +154,90 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
     private void putData(String key, String value) throws Exception {
         try {
-            KVMessage msgBack = kvclient.put(key, value);
-//            KVMessage.StatusType status = msgBack.getStatus();
-//            if (status == KVMessage.StatusType.PUT_ERROR) {
-//                printError("Put Error!");
-//            } else if (status == KVMessage.StatusType.PUT_SUCCESS) {
-//                System.out.println("Put Data Success!");
-//            } else if (status == KVMessage.StatusType.PUT_UPDATE) {
-//                System.out.println("Put Update Success!");
-//            } else {
-//                printError("Unexpected Response Type From Put Request!");
-//            }
+            KVMessage message = kvStore.put(key, value);
+            handleMessage(message);
         } catch (IOException e) {
             printError("Unable to send put request!");
-            newDisconnection();
+            disconnect();
         }
     }
 
     private void getData(String key) throws Exception {
         try {
-            KVMessage msgBack = kvclient.get(key);
-//            KVMessage.StatusType status = msgBack.getStatus();
-//            String value = msgBack.getValue();
-//            if (status == KVMessage.StatusType.GET_ERROR) {
-//                printError("Get Error!");
-//            } else if (status == KVMessage.StatusType.GET_SUCCESS) {
-//                System.out.println("Get Data Success!");
-//                System.out.println(value);
-//            } else {
-//                printError("Unexpected Response Type From GET Request!");
-//            }
+            KVMessage message = kvStore.get(key);
+            handleMessage(message);
         } catch (IOException e) {
             printError("Unable to send GET request!");
-            newDisconnection();
+            disconnect();
         }
 
     }
 
-    @Override
-    public void newConnection(String address, int port) throws Exception {
-        kvclient = new KVStore(address, port);
-        kvclient.connect();
-        kvclient.addListener(this);
-//        kvclient.start();
+    public boolean connectionValid() {
+        return kvStore != null && kvStore.isConnectionValid();
     }
 
-    private void newDisconnection() {
-        if (kvclient != null) {
+    @Override
+    public void connect(String address, int port) throws Exception {
+        if (kvStore == null) {
+            kvStore = new KVStore(address, port);
+            boolean connectionSuccessful = kvStore.connect();
+            if (connectionSuccessful) {
+                System.out.println("Connection established.");
+                kvStore.addListener(this);
+            } else { // Connection failed
+                kvStore = null;
+                printError("Connection failed.");
+            }
+        }
+    }
+
+    private void disconnect() {
+        if (kvStore != null) {
             try {
-                kvclient.disconnect();
-                kvclient = null;
+                kvStore.disconnect();
+                kvStore.removeListener(this);
+                kvStore = null;
+                System.out.println("Disconnected.");
             } catch (Exception e) {
-                printError("No connection to close");
+                logger.error("Failed to disconnect", e);
+                printError("Failed to disconnect.");
             }
         }
     }
 
     private void printHelp() {
         StringBuilder sb = new StringBuilder();
-        sb.append(PROMPT).append("ECHO CLIENT HELP (Usage):\n");
-        sb.append(PROMPT);
+        sb.append("ECHO CLIENT HELP (Usage):\n");
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
-        sb.append(PROMPT).append("connect <host> <port>");
+        sb.append("connect <host> <port>");
         sb.append("\t establishes a connection to a server\n");
-        sb.append(PROMPT).append("put <key> <value>");
-        sb.append("\t\t insert or update a new tuple to the server \n");
-        sb.append(PROMPT).append("get <key>");
-        sb.append("\t\t\t get the value of the key from the server \n");
-        sb.append(PROMPT).append("disconnect");
-        sb.append("\t\t\t disconnects from the server \n");
+        sb.append("put <key> <value>");
+        sb.append("\t insert or update a new tuple to the server \n");
+        sb.append("delete <key>");
+        sb.append("\t\t delete the tuple from the server \n");
+        sb.append("get <key>");
+        sb.append("\t\t get the value of the key from the server \n");
+        sb.append("disconnect");
+        sb.append("\t\t disconnects from the server \n");
 
-        sb.append(PROMPT).append("logLevel");
-        sb.append("\t\t\t changes the logLevel \n");
-        sb.append(PROMPT).append("\t\t\t\t ");
+        sb.append("logLevel");
+        sb.append("\t\t changes the logLevel \n");
+        sb.append("\t\t\t ");
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
 
-        sb.append(PROMPT).append("quit ");
+        sb.append("quit ");
         sb.append("\t\t\t exits the program");
         System.out.println(sb.toString());
     }
 
     private void printPossibleLogLevels() {
-        System.out.println(PROMPT
-                + "Possible log levels are:");
-        System.out.println(PROMPT
-                + "ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF");
+        System.out.println("Possible log levels are:");
+        System.out.println("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF");
     }
 
-    private String setLevel(String levelString) {
+    private String setLogLevel(String levelString) {
 
         if (levelString.equals(Level.ALL.toString())) {
             logger.setLevel(Level.ALL);
@@ -250,47 +265,60 @@ public class KVClient implements IKVClient, ClientSocketListener {
         }
     }
 
-    @Override
-    public void handleNewMessage(KVMessage msg) {
-        if (!stop) {
-            String status = msg.getStatus().name();
-            String key = msg.getKey();
-            String value = msg.getValue();
-            if (status.equals("GET_ERROR")) {
-                System.out.println(status + "<" + key + ">");
-            } else if (status.equals("FAILED")) {
-                System.out.println(status + "<" + value + ">");
-            } else {
-                System.out.println(status + "<" + key + "," + value + ">");
-            }
-            System.out.print(PROMPT);
+    public void handleMessage(KVMessage msg) {
+        KVMessage.StatusType status = msg.getStatus();
+        String key = msg.getKey();
+        String value = msg.getValue();
+        switch (status) {
+            case GET_ERROR:
+                System.out.println(status.name() + "<" + key + ">");
+                break;
+            case GET_SUCCESS:
+                System.out
+                        .println(status.name() + "<" + key + "," + value + ">");
+                break;
+            case PUT_SUCCESS:
+                System.out
+                        .println(status.name() + "<" + key + "," + value + ">");
+                break;
+            case PUT_UPDATE:
+                System.out
+                        .println(status.name() + "<" + key + "," + value + ">");
+                break;
+            case PUT_ERROR:
+                System.out
+                        .println(status.name() + "<" + key + "," + value + ">");
+                break;
+            case DELETE_SUCCESS:
+                System.out.println(status.name() + "<" + key + ">");
+                break;
+            case DELETE_ERROR:
+                System.out.println(status.name() + "<" + key + ">");
+                break;
+            case FAILED:
+                System.out.println(status.name() + "<" + value + ">");
+                break;
+            default:
+                printError("Invalid status: " + status.name());
+                break;
         }
     }
 
-    @Override
-    public void handleStatus(SocketStatus status) {
-        if (status == SocketStatus.CONNECTED) {
-
-        } else if (status == SocketStatus.DISCONNECTED) {
-            System.out.print(PROMPT);
+    public void handleStatusChange(SocketStatus status) {
+        if (status == SocketStatus.DISCONNECTED) {
             System.out.println("Connection terminated: "
-                    + serverAddress + " / " + serverPort);
-
-        } else if (status == SocketStatus.CONNECTION_LOST) {
-            System.out.println("Connection lost: "
                     + serverAddress + " / " + serverPort);
             System.out.print(PROMPT);
         }
-
     }
 
     @Override
     public KVCommInterface getStore() {
-        return kvclient;
+        return kvStore;
     }
 
     private void printError(String error) {
-        System.out.println(PROMPT + "Error! " + error);
+        System.out.println("Error: " + error);
     }
 
     /**
