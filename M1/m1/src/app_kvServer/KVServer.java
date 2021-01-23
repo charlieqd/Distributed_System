@@ -1,6 +1,7 @@
 package app_kvServer;
 
 import logger.LogSetup;
+import org.apache.commons.cli.*;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import server.*;
@@ -20,8 +21,9 @@ public class KVServer extends Thread implements IKVServer {
 
     private static Logger logger = Logger.getRootLogger();
 
-    private static final int DEFAULT_CACHE_SIZE = 8192;
-    private static final CacheStrategy DEFAULT_CACHE_STRATEGY = CacheStrategy.FIFO;
+    private static final String DEFAULT_CACHE_SIZE = "8192";
+    private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
+    private static final String DEFAULT_PORT = "8080";
 
     private int port;
     private ServerSocket serverSocket;
@@ -54,6 +56,7 @@ public class KVServer extends Thread implements IKVServer {
      */
     @Override
     public void run() {
+        //Options options = new Options();
 
         running = initializeServer();
 
@@ -122,10 +125,53 @@ public class KVServer extends Thread implements IKVServer {
         try {
             // TODO implement path and other params
             String rootPath = "data";
-            int cacheSize = DEFAULT_CACHE_SIZE;
-            CacheStrategy cacheStrategy = DEFAULT_CACHE_STRATEGY;
 
             KeyHashStrategy keyHashStrategy = null;
+
+            // create the command line parser
+            CommandLineParser parser = new DefaultParser();
+
+            // create the Options
+            Options options = new Options();
+            addOption(options, "s", "cacheSize", true,
+                    "the capacity of the cache", false);
+            addOption(options, "p", "port", true,
+                    "port number", false);
+            addOption(options, "c", "cacheStrategy", true,
+                    "the type of cache: FIFO | None | LRU", false);
+            addOption(options, "h", "help", false,
+                    "see the help menu", false);
+
+            int port;
+            int cacheSize;
+            CacheStrategy cacheStrategy;
+            HelpFormatter formatter = new HelpFormatter();
+
+            try {
+                CommandLine cmd = parser.parse(options, args);
+
+                if (cmd.hasOption('h')) {
+                    formatter.printHelp("m1-server", options);
+                    System.exit(1);
+                    return;
+                }
+
+                if (!cmd.hasOption("p")) {
+                    System.out.println("Using default port " + DEFAULT_PORT);
+                }
+
+                cacheSize = Integer.parseInt(cmd.getOptionValue("s",
+                        DEFAULT_CACHE_SIZE));
+                port = Integer.parseInt(cmd.getOptionValue("p", DEFAULT_PORT));
+                cacheStrategy = CacheStrategy
+                        .fromString(cmd.getOptionValue("c", "FIFO"));
+            } catch (Exception e) {
+                e.printStackTrace();
+                formatter.printHelp("m1-server", options);
+                System.exit(1);
+                return;
+            }
+
             try {
                 keyHashStrategy = new MD5PrefixKeyHashStrategy(1);
             } catch (NoSuchAlgorithmException e) {
@@ -139,14 +185,10 @@ public class KVServer extends Thread implements IKVServer {
             IProtocol protocol = new Protocol();
             ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
             new LogSetup("logs/server.log", Level.ALL);
-            if (args.length != 1) {
-                System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: Server <port>!");
-            } else {
-                int port = Integer.parseInt(args[0]);
-                new KVServer(storage, protocol, messageSerializer, port)
-                        .start();
-            }
+
+            new KVServer(storage, protocol, messageSerializer, port)
+                    .start();
+
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");
             e.printStackTrace();
@@ -156,6 +198,15 @@ public class KVServer extends Thread implements IKVServer {
             System.out.println("Usage: Server <port>!");
             System.exit(1);
         }
+    }
+
+    private static void addOption(Options options, String opt, String longOpt,
+                                  boolean hasArg, String description,
+                                  boolean required) {
+        Option option = new Option(opt, longOpt, hasArg,
+                description);
+        option.setRequired(required);
+        options.addOption(option);
     }
 
     @Override
