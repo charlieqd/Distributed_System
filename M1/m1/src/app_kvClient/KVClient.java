@@ -196,10 +196,12 @@ public class KVClient implements IKVClient, KVStoreListener {
     private void disconnect() {
         if (kvStore != null) {
             try {
+                if (kvStore.isConnectionValid()) {
+                    System.out.println("Disconnecting.");
+                }
                 kvStore.disconnect();
                 kvStore.removeListener(this);
                 kvStore = null;
-                System.out.println("Disconnected.");
             } catch (Exception e) {
                 logger.error("Failed to disconnect", e);
                 printError("Failed to disconnect.");
