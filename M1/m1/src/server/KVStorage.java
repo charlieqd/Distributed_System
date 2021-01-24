@@ -1,6 +1,7 @@
 package server;
 
 import app_kvServer.IKVServer;
+import org.apache.log4j.Logger;
 import shared.messages.KVMessage;
 
 import java.io.File;
@@ -11,6 +12,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class KVStorage implements IKVStorage {
+
+    private static final Logger logger = Logger.getRootLogger();
 
     private static final String NULL_VALUE = new String();
 
@@ -23,7 +26,7 @@ public class KVStorage implements IKVStorage {
 
     private final Cache<String, String> cache;
 
-    private Lock lock;
+    private final Lock lock;
 
     /**
      * @param rootPath
@@ -77,6 +80,7 @@ public class KVStorage implements IKVStorage {
                 value = fileStorage.read(key);
 
                 cache.put(key, value == null ? NULL_VALUE : value);
+                logger.info("Cache missed for key \"" + key + "\"");
             }
             return value == NULL_VALUE ? null : value;
         } finally {
