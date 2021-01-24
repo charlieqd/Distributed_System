@@ -69,11 +69,23 @@ public class ClientConnection implements Runnable {
 
                     KVMessage requestMessage = readMessage(request);
                     if (requestMessage == null) {
+                        logger.info("RECEIVE \t<"
+                                + clientSocket.getInetAddress()
+                                .getHostAddress() + ":"
+                                + clientSocket
+                                .getPort() + ">: invalid message");
+
                         sendResponse(output, request, Response.Status.OK,
                                 new KVMessageImpl(null, "Invalid message",
                                         KVMessage.StatusType.FAILED));
                         continue;
                     }
+
+                    logger.info("RECEIVE \t<"
+                            + clientSocket.getInetAddress()
+                            .getHostAddress() + ":"
+                            + clientSocket.getPort() + ">: '"
+                            + requestMessage.toString() + "'");
 
                     handleMessage(output, request, requestMessage);
 
@@ -171,6 +183,19 @@ public class ClientConnection implements Runnable {
             }
         }
 
+        if (responseMessage == null) {
+            logger.info("SEND \t<"
+                    + clientSocket.getInetAddress()
+                    .getHostAddress() + ":"
+                    + clientSocket.getPort() + ">: null");
+        } else {
+            logger.info("SEND \t<"
+                    + clientSocket.getInetAddress()
+                    .getHostAddress() + ":"
+                    + clientSocket.getPort() + ">: '"
+                    + responseMessage.toString() + "'");
+        }
+
         sendResponse(output, request, Response.Status.OK,
                 responseMessage);
     }
@@ -200,10 +225,6 @@ public class ClientConnection implements Runnable {
 
         protocol.writeResponse(output, request, status,
                 messageBytes);
-
-        logger.info("SEND \t<"
-                + clientSocket.getInetAddress().getHostAddress() + ":"
-                + clientSocket.getPort() + ">");
     }
 
 
@@ -214,10 +235,6 @@ public class ClientConnection implements Runnable {
      */
     private Request receiveRequest(InputStream input) throws IOException {
         Request request = protocol.readRequest(input);
-
-        logger.info("RECEIVE \t<"
-                + clientSocket.getInetAddress().getHostAddress() + ":"
-                + clientSocket.getPort() + ">");
 
         return request;
     }

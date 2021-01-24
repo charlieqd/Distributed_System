@@ -123,7 +123,6 @@ public class KVServer extends Thread implements IKVServer {
      */
     public static void main(String[] args) {
         try {
-            // TODO implement path and other params
             String rootPath = "data";
 
             KeyHashStrategy keyHashStrategy = null;
@@ -133,10 +132,10 @@ public class KVServer extends Thread implements IKVServer {
 
             // create the Options
             Options options = new Options();
+            addOption(options, "p", "port", true,
+                    "port number", true);
             addOption(options, "s", "cacheSize", true,
                     "the capacity of the cache", false);
-            addOption(options, "p", "port", true,
-                    "port number", false);
             addOption(options, "c", "cacheStrategy", true,
                     "the type of cache: FIFO | None | LRU", false);
             addOption(options, "h", "help", false,
@@ -152,6 +151,13 @@ public class KVServer extends Thread implements IKVServer {
             Level logLevel;
 
             try {
+                if (args.length == 1 &&
+                        (args[0].equals("-h") || args[0].equals("--help"))) {
+                    formatter.printHelp("m1-server", options);
+                    System.exit(1);
+                    return;
+                }
+
                 CommandLine cmd = parser.parse(options, args);
 
                 if (cmd.hasOption('h')) {
@@ -178,6 +184,8 @@ public class KVServer extends Thread implements IKVServer {
                 return;
             }
 
+            new LogSetup("logs/server.log", logLevel);
+
             try {
                 keyHashStrategy = new MD5PrefixKeyHashStrategy(1);
             } catch (NoSuchAlgorithmException e) {
@@ -190,7 +198,6 @@ public class KVServer extends Thread implements IKVServer {
                     cacheSize, cacheStrategy);
             IProtocol protocol = new Protocol();
             ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
-            new LogSetup("logs/server.log", logLevel);
 
             new KVServer(storage, protocol, messageSerializer, port)
                     .start();

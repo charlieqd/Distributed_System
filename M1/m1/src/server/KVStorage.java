@@ -66,6 +66,7 @@ public class KVStorage implements IKVStorage {
             throw new IllegalArgumentException(
                     "Unsupported cache strategy: " + cacheStrategy.toString());
         }
+        logger.info("Cache strategy: " + cacheStrategy.toString());
 
         lock = new ReentrantLock();
     }

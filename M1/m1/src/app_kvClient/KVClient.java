@@ -56,7 +56,7 @@ public class KVClient implements IKVClient, KVStoreListener {
     }
 
     private void handleCommand(String cmdLine) throws Exception {
-        String[] tokens = cmdLine.split("\\s+");
+        String[] tokens = cmdLine.trim().split("\\s+");
 
         if (tokens[0].equals("quit")) {
             stop = true;
@@ -64,10 +64,10 @@ public class KVClient implements IKVClient, KVStoreListener {
             System.out.println("Application exit!");
 
         } else if (tokens[0].equals("connect")) {
-            if (connectionValid()) {
-                printError("Already connected!");
-            } else {
-                if (tokens.length == 3) {
+            if (tokens.length == 3) {
+                if (connectionValid()) {
+                    printError("Already connected!");
+                } else {
                     try {
                         serverAddress = tokens[1];
                         serverPort = Integer.parseInt(tokens[2]);
@@ -83,16 +83,20 @@ public class KVClient implements IKVClient, KVStoreListener {
                         printError("Could not establish connection!");
                         logger.warn("Could not establish connection!", e);
                     }
-                } else {
-                    printError("Invalid number of parameters!");
                 }
+            } else {
+                printError("Invalid number of parameters!");
             }
 
         } else if (tokens[0].equals("disconnect")) {
-            if (kvStore != null) {
-                disconnect();
+            if (tokens.length == 1) {
+                if (kvStore != null) {
+                    disconnect();
+                } else {
+                    printError("No connection to close");
+                }
             } else {
-                printError("No connection to close");
+                printError("Invalid number of parameters!");
             }
 
         } else if (tokens[0].equals("logLevel")) {
@@ -109,10 +113,10 @@ public class KVClient implements IKVClient, KVStoreListener {
             }
 
         } else if (tokens[0].equals("put")) {
-            if (tokens.length == 3) {
+            if (tokens.length == 3 || tokens.length == 2) {
                 if (connectionValid()) {
                     String key = tokens[1];
-                    String value = tokens[2];
+                    String value = tokens.length == 3 ? tokens[2] : null;
                     putData(key, value);
                 } else {
                     printError("Not connected or connection stopped!");
@@ -216,12 +220,13 @@ public class KVClient implements IKVClient, KVStoreListener {
         sb.append("::::::::::::::::::::::::::::::::\n");
         sb.append("connect <host> <port>");
         sb.append("\t establishes a connection to a server\n");
-        sb.append("put <key> <value>");
-        sb.append("\t insert or update a new tuple to the server \n");
+        sb.append("get <key>");
+        sb.append("\t\t get the value from the server \n");
+        sb.append("put <key> [<value>]");
+        sb.append(
+                "\t insert or update a tuple. if value is not given, delete the tuple. \n");
         sb.append("delete <key>");
         sb.append("\t\t delete the tuple from the server \n");
-        sb.append("get <key>");
-        sb.append("\t\t get the value of the key from the server \n");
         sb.append("disconnect");
         sb.append("\t\t disconnects from the server \n");
 
