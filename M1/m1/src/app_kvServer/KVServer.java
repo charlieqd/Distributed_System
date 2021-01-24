@@ -141,11 +141,15 @@ public class KVServer extends Thread implements IKVServer {
                     "the type of cache: FIFO | None | LRU", false);
             addOption(options, "h", "help", false,
                     "see the help menu", false);
+            addOption(options, "l", "logLevel", true,
+                    "log level of the server: ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF",
+                    false);
 
             int port;
             int cacheSize;
             CacheStrategy cacheStrategy;
             HelpFormatter formatter = new HelpFormatter();
+            Level logLevel;
 
             try {
                 CommandLine cmd = parser.parse(options, args);
@@ -165,6 +169,8 @@ public class KVServer extends Thread implements IKVServer {
                 port = Integer.parseInt(cmd.getOptionValue("p", DEFAULT_PORT));
                 cacheStrategy = CacheStrategy
                         .fromString(cmd.getOptionValue("c", "FIFO"));
+
+                logLevel = Level.toLevel(cmd.getOptionValue("l", "ALL"));
             } catch (Exception e) {
                 e.printStackTrace();
                 formatter.printHelp("m1-server", options);
@@ -184,7 +190,7 @@ public class KVServer extends Thread implements IKVServer {
                     cacheSize, cacheStrategy);
             IProtocol protocol = new Protocol();
             ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
-            new LogSetup("logs/server.log", Level.ALL);
+            new LogSetup("logs/server.log", logLevel);
 
             new KVServer(storage, protocol, messageSerializer, port)
                     .start();
