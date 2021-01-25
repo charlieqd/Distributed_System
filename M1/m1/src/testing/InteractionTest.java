@@ -179,12 +179,14 @@ public class InteractionTest {
 
         try {
             kvClient.put(key, value);
+            kvClient.put(key, null);
             response = kvClient.get(key);
         } catch (Exception e) {
             ex = e;
         }
 
-        assertTrue(ex == null && response.getValue().equals("bar"));
+        assertTrue(ex == null && response.getStatus() == StatusType.GET_ERROR);
+
     }
 
 

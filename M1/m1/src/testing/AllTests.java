@@ -16,7 +16,7 @@ import shared.messages.KVMessageSerializer;
 
 
 @RunWith(Suite.class)
-@Suite.SuiteClasses({ConnectionTest.class, InteractionTest.class, AdditionalTest.class})
+@Suite.SuiteClasses({ConnectionTest.class, InteractionTest.class, AdditionalTest.class, ApplicationTest.class})
 public class AllTests {
 
     @ClassRule
