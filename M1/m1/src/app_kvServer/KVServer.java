@@ -24,6 +24,8 @@ public class KVServer extends Thread implements IKVServer {
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
+    private static final String DEFAULT_DATA_PATH = "data";
+    private static final String DEFAULT_LOG_LEVEL = "ALL";
 
     private int port;
     private ServerSocket serverSocket;
@@ -117,16 +119,10 @@ public class KVServer extends Thread implements IKVServer {
     }
 
     /**
-     * Main entry point for the echo server application.
-     *
-     * @param args contains the port number at args[0].
+     * Main entry point for the server application.
      */
     public static void main(String[] args) {
         try {
-            String rootPath = "data";
-
-            KeyHashStrategy keyHashStrategy = null;
-
             // create the command line parser
             CommandLineParser parser = new DefaultParser();
 
@@ -134,6 +130,8 @@ public class KVServer extends Thread implements IKVServer {
             Options options = new Options();
             addOption(options, "p", "port", true,
                     "port number", true);
+            addOption(options, "d", "dataPath", true,
+                    "path to data folder", false);
             addOption(options, "s", "cacheSize", true,
                     "the capacity of the cache", false);
             addOption(options, "c", "cacheStrategy", true,
@@ -149,6 +147,7 @@ public class KVServer extends Thread implements IKVServer {
             CacheStrategy cacheStrategy;
             HelpFormatter formatter = new HelpFormatter();
             Level logLevel;
+            String rootPath;
 
             try {
                 if (args.length == 1 &&
@@ -169,14 +168,26 @@ public class KVServer extends Thread implements IKVServer {
                 if (!cmd.hasOption("p")) {
                     System.out.println("Using default port " + DEFAULT_PORT);
                 }
+                if (!cmd.hasOption("d")) {
+                    System.out.println(
+                            "Using default data path '" + DEFAULT_DATA_PATH + "'");
+                }
 
                 cacheSize = Integer.parseInt(cmd.getOptionValue("s",
                         DEFAULT_CACHE_SIZE));
+                if (cacheSize <= 0) {
+                    throw new IllegalArgumentException(
+                            "Invalid cache size: " + cacheSize);
+                }
+
+                rootPath = cmd.getOptionValue("d", DEFAULT_DATA_PATH);
                 port = Integer.parseInt(cmd.getOptionValue("p", DEFAULT_PORT));
                 cacheStrategy = CacheStrategy
-                        .fromString(cmd.getOptionValue("c", "FIFO"));
+                        .fromString(cmd.getOptionValue("c",
+                                DEFAULT_CACHE_STRATEGY));
 
-                logLevel = Level.toLevel(cmd.getOptionValue("l", "ALL"));
+                logLevel = Level
+                        .toLevel(cmd.getOptionValue("l", DEFAULT_LOG_LEVEL));
             } catch (Exception e) {
                 e.printStackTrace();
                 formatter.printHelp("m1-server", options);
@@ -185,6 +196,8 @@ public class KVServer extends Thread implements IKVServer {
             }
 
             new LogSetup("logs/server.log", logLevel);
+
+            KeyHashStrategy keyHashStrategy = null;
 
             try {
                 keyHashStrategy = new MD5PrefixKeyHashStrategy(1);

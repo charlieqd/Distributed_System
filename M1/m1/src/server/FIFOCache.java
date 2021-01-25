@@ -46,4 +46,10 @@ public class FIFOCache<K, V> implements Cache<K, V> {
             dic.remove(firstKey);
         }
     }
+
+    @Override
+    public void clear() {
+        this.queue.clear();
+        this.dic.clear();
+    }
 }

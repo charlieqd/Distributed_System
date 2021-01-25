@@ -10,6 +10,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import shared.Util;
 import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -37,6 +38,7 @@ public class KVClient implements IKVClient, KVStoreListener {
                 this.handleCommand(cmdLine);
             } catch (IOException e) {
                 stop = true;
+                logger.error("Failed to read from command line", e);
                 printError("CLI does not respond - Application terminated ");
             }
 
@@ -91,6 +93,7 @@ public class KVClient implements IKVClient, KVStoreListener {
         } else if (tokens[0].equals("disconnect")) {
             if (tokens.length == 1) {
                 if (kvStore != null) {
+                    System.out.println("Disconnecting.");
                     disconnect();
                 } else {
                     printError("No connection to close");
@@ -158,21 +161,44 @@ public class KVClient implements IKVClient, KVStoreListener {
     }
 
     private void putData(String key, String value) throws Exception {
+        if (key != null &&
+                key.length() > KVMessageImpl.MAX_KEY_LENGTH) {
+            printError(
+                    "Key too large; max length " + KVMessageImpl.MAX_KEY_LENGTH);
+            return;
+        }
+
+        if (value != null &&
+                value.length() > KVMessageImpl.MAX_VALUE_LENGTH) {
+            printError(
+                    "Value too large; max length " + KVMessageImpl.MAX_VALUE_LENGTH);
+            return;
+        }
+
         try {
             KVMessage message = kvStore.put(key, value);
             handleMessage(message);
         } catch (IOException e) {
-            printError("Unable to send put request!");
+            printError("Unable to send PUT request!");
+            logger.warn("Unable to send PUT request", e);
             disconnect();
         }
     }
 
     private void getData(String key) throws Exception {
+        if (key != null &&
+                key.length() > KVMessageImpl.MAX_KEY_LENGTH) {
+            printError(
+                    "Key too large; max length " + KVMessageImpl.MAX_KEY_LENGTH);
+            return;
+        }
+
         try {
             KVMessage message = kvStore.get(key);
             handleMessage(message);
         } catch (IOException e) {
             printError("Unable to send GET request!");
+            logger.warn("Unable to send GET request", e);
             disconnect();
         }
 
@@ -192,6 +218,7 @@ public class KVClient implements IKVClient, KVStoreListener {
                 System.out.println("Connection established.");
             } catch (Exception e) {
                 kvStore = null;
+                logger.warn("Connection failed", e);
                 printError("Connection failed: " + Util.getStackTraceString(e));
             }
         }
@@ -200,9 +227,6 @@ public class KVClient implements IKVClient, KVStoreListener {
     private void disconnect() {
         if (kvStore != null) {
             try {
-                if (kvStore.isConnectionValid()) {
-                    System.out.println("Disconnecting.");
-                }
                 kvStore.disconnect();
                 kvStore.removeListener(this);
                 kvStore = null;
@@ -215,7 +239,7 @@ public class KVClient implements IKVClient, KVStoreListener {
 
     private void printHelp() {
         StringBuilder sb = new StringBuilder();
-        sb.append("ECHO CLIENT HELP (Usage):\n");
+        sb.append("KV CLIENT HELP (Usage):\n");
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
         sb.append("connect <host> <port>");
@@ -279,32 +303,28 @@ public class KVClient implements IKVClient, KVStoreListener {
         String value = msg.getValue();
         switch (status) {
             case GET_ERROR:
-                System.out.println(status.name() + "<" + key + ">");
+                System.out.println("Tuple does not exist.");
                 break;
             case GET_SUCCESS:
-                System.out
-                        .println(status.name() + "<" + key + "," + value + ">");
+                System.out.println("Value: " + value);
                 break;
             case PUT_SUCCESS:
-                System.out
-                        .println(status.name() + "<" + key + "," + value + ">");
+                System.out.println("Tuple inserted.");
                 break;
             case PUT_UPDATE:
-                System.out
-                        .println(status.name() + "<" + key + "," + value + ">");
+                System.out.println("Tuple updated.");
                 break;
             case PUT_ERROR:
-                System.out
-                        .println(status.name() + "<" + key + "," + value + ">");
+                System.out.println("Error: failed to insert tuple.");
                 break;
             case DELETE_SUCCESS:
-                System.out.println(status.name() + "<" + key + ">");
+                System.out.println("Tuple deleted.");
                 break;
             case DELETE_ERROR:
-                System.out.println(status.name() + "<" + key + ">");
+                System.out.println("Tuple does not exist.");
                 break;
             case FAILED:
-                System.out.println(status.name() + "<" + value + ">");
+                System.out.println("Failed: " + value);
                 break;
             default:
                 printError("Invalid status: " + status.name());
@@ -330,9 +350,7 @@ public class KVClient implements IKVClient, KVStoreListener {
     }
 
     /**
-     * Main entry point for the echo server application.
-     *
-     * @param args contains the port number at args[0].
+     * Main entry point for the client application.
      */
     public static void main(String[] args) throws Exception {
         try {

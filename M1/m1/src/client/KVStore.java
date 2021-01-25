@@ -8,7 +8,6 @@ import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
-import shared.messages.TextMessage;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -131,8 +130,11 @@ public class KVStore implements KVCommInterface {
                 }
 
                 try {
-                    return serializer.decode(msgByte);
+                    KVMessage message = serializer.decode(msgByte);
+                    logger.info("Received message: " + message.toString());
+                    return message;
                 } catch (Exception e) {
+                    logger.warn("Failed to decode message", e);
                     return new KVMessageImpl(null,
                             "Failed to decode message",
                             KVMessage.StatusType.FAILED);
@@ -157,6 +159,7 @@ public class KVStore implements KVCommInterface {
                             KVMessage.StatusType status) throws IOException {
         try {
             KVMessage kvMsg = new KVMessageImpl(key, value, status);
+            logger.info("Sending message: " + kvMsg.toString());
             byte[] msgBytes;
             try {
                 msgBytes = serializer.encode(kvMsg);
@@ -231,8 +234,13 @@ public class KVStore implements KVCommInterface {
 
         try {
             running = false;
+
             logger.info("tearing down the connection ...");
+
             if (clientSocket != null) {
+                // This must be after setting running = false to avoid infinite recursion
+                sendRequest(null, null, KVMessage.StatusType.DISCONNECT);
+
                 clientSocket.close();
                 clientSocket = null;
                 try {
@@ -288,12 +296,5 @@ public class KVStore implements KVCommInterface {
                 listener.handleStatusChange(status);
             }
         }
-    }
-
-    public void sendMessage(TextMessage msg) throws IOException {
-        byte[] msgBytes = msg.getMsgBytes();
-        output.write(msgBytes, 0, msgBytes.length);
-        output.flush();
-        logger.info("Send message:\t '" + msg.getMsg() + "'");
     }
 }

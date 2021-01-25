@@ -11,4 +11,6 @@ public interface IKVStorage {
     String get(String key) throws IOException;
 
     KVMessage.StatusType put(String key, String value) throws IOException;
+
+    void clearCache();
 }

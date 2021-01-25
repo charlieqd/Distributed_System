@@ -105,6 +105,16 @@ public class KVStorage implements IKVStorage {
         }
     }
 
+    @Override
+    public void clearCache() {
+        lock.lock();
+        try {
+            cache.clear();
+        } finally {
+            lock.unlock();
+        }
+    }
+
     private IKVFileStorage getFileStorage(String key) {
         String hash = keyHashStrategy.hashKey(key);
         return files.computeIfAbsent(hash, k -> new KVFileStorage(

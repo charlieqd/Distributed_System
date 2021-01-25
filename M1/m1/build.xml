@@ -120,6 +120,15 @@
         </junit>
     </target>
 
+    <!-- run performance test -->
+    <target name="perf" depends="build">
+        <junit>
+            <classpath refid="project.classpath"/>
+            <formatter type="brief" usefile="false"/>
+            <test name="testing.PerformanceTest"/>
+        </junit>
+    </target>
+
     <target name="run">
         <java classname="${main.class}" classpathref="class.path"/>
     </target>

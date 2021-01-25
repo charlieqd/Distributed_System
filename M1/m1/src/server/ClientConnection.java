@@ -13,9 +13,7 @@ import java.net.Socket;
 
 /**
  * Represents a connection end point for a particular client that is connected
- * to the server. This class is responsible for message reception and sending.
- * The class also implements the echo functionality. Thus whenever a message is
- * received it is going to be echoed back to the client.
+ * to the server.
  */
 public class ClientConnection implements Runnable {
 
@@ -92,13 +90,15 @@ public class ClientConnection implements Runnable {
                 } catch (IOException ioe) {
                     /* connection either terminated by the client or lost due to
                      * network problems */
-                    logger.error("Error! Connection lost!", ioe);
+                    logger.error(
+                            "Error: Failed to read socket input. Closing connection.",
+                            ioe);
                     isOpen = false;
                 }
             }
 
         } catch (IOException ioe) {
-            logger.error("Error! Connection could not be established!", ioe);
+            logger.error("Error: Connection could not be established.", ioe);
 
         } finally {
 
@@ -109,7 +109,7 @@ public class ClientConnection implements Runnable {
                     clientSocket.close();
                 }
             } catch (IOException ioe) {
-                logger.error("Error! Unable to tear down connection!", ioe);
+                logger.error("Error: Unable to tear down connection.", ioe);
             }
         }
     }
@@ -121,6 +121,15 @@ public class ClientConnection implements Runnable {
         KVMessage responseMessage = null;
 
         switch (requestMessage.getStatus()) {
+            case DISCONNECT: {
+                isOpen = false;
+                logger.info("Client disconnected \t<"
+                        + clientSocket.getInetAddress()
+                        .getHostAddress() + ":"
+                        + clientSocket.getPort() + ">");
+                return;
+            }
+
             case GET: {
                 String key = requestMessage.getKey();
                 if (key == null) {
