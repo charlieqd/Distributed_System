@@ -113,7 +113,7 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            response = kvClient.put(key, null);
+            response = kvStore.put(key, null);
 
         } catch (Exception e) {
             ex = e;
@@ -157,12 +157,12 @@ public class InteractionTest {
 
     @Test
     public void testGetDisconnect() {
-        kvClient.disconnect();
+        kvStore.disconnect();
         String key = "KV_Test";
         Exception ex = null;
 
         try {
-            kvClient.get(key);
+            kvStore.get(key);
         } catch (Exception e) {
             ex = e;
         }
@@ -178,9 +178,9 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            kvClient.put(key, value);
-            kvClient.put(key, null);
-            response = kvClient.get(key);
+            kvStore.put(key, value);
+            kvStore.put(key, null);
+            response = kvStore.get(key);
         } catch (Exception e) {
             ex = e;
         }

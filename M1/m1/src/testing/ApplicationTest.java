@@ -56,7 +56,7 @@ public class ApplicationTest {
         String cmd = "connect localhost 50000\n" + "put putTest 1\n" + "quit\n";
         String[] lines = runAppByCmd(cmd);
         assertTrue("KVClient> Connection established.".equals(lines[0]) &&
-                "KVClient> PUT_SUCCESS<putTest,1>".equals(lines[2]));
+                "KVClient> Tuple inserted.".equals(lines[2]));
     }
 
     @Test
@@ -64,8 +64,8 @@ public class ApplicationTest {
         String cmd = "connect localhost 50000\n" + "put getTest 2\n" + "get getTest\n" + "quit\n";
         String[] lines = runAppByCmd(cmd);
         assertTrue("KVClient> Connection established.".equals(lines[0]) &&
-                "KVClient> PUT_SUCCESS<getTest,2>".equals(lines[2]) &&
-                "KVClient> GET_SUCCESS<getTest,2>".equals(lines[4]));
+                "KVClient> Tuple inserted.".equals(lines[2]) &&
+                "KVClient> Value: 2".equals(lines[4]));
     }
 
     @Test
@@ -73,8 +73,8 @@ public class ApplicationTest {
         String cmd = "connect localhost 50000\n" + "put getVal 2\n" + "get getError\n" + "quit\n";
         String[] lines = runAppByCmd(cmd);
         assertTrue("KVClient> Connection established.".equals(lines[0]) &&
-                "KVClient> PUT_SUCCESS<getVal,2>".equals(lines[2]) &&
-                "KVClient> GET_ERROR<getError>".equals(lines[4]));
+                "KVClient> Tuple inserted.".equals(lines[2]) &&
+                "KVClient> Tuple does not exist.".equals(lines[4]));
     }
 
     @Test
@@ -82,8 +82,8 @@ public class ApplicationTest {
         String cmd = "connect localhost 50000\n" + "put updateVal 2\n" + "put updateVal 3\n" + "quit\n";
         String[] lines = runAppByCmd(cmd);
         assertTrue("KVClient> Connection established.".equals(lines[0]) &&
-                "KVClient> PUT_SUCCESS<updateVal,2>".equals(lines[2]) &&
-                "KVClient> PUT_UPDATE<updateVal,3>".equals(lines[4]));
+                "KVClient> Tuple inserted.".equals(lines[2]) &&
+                "KVClient> Tuple updated.".equals(lines[4]));
     }
 
     @Test
@@ -91,8 +91,8 @@ public class ApplicationTest {
         String cmd = "connect localhost 50000\n" + "put deleteVal 2\n" + "put deleteVal\n" + "quit\n";
         String[] lines = runAppByCmd(cmd);
         assertTrue("KVClient> Connection established.".equals(lines[0]) &&
-                "KVClient> PUT_SUCCESS<deleteVal,2>".equals(lines[2]) &&
-                "KVClient> DELETE_SUCCESS<deleteVal>".equals(lines[4]));
+                "KVClient> Tuple inserted.".equals(lines[2]) &&
+                "KVClient> Tuple deleted.".equals(lines[4]));
     }
 
     @Test
@@ -100,7 +100,7 @@ public class ApplicationTest {
         String cmd = "connect localhost 50000\n" + "put deleteErrorVal\n" + "quit\n";
         String[] lines = runAppByCmd(cmd);
         assertTrue("KVClient> Connection established.".equals(lines[0]) &&
-                "KVClient> DELETE_ERROR<deleteErrorVal>".equals(lines[2]));
+                "KVClient> Tuple does not exist.".equals(lines[2]));
     }
 
     @Test
