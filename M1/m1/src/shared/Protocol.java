@@ -2,9 +2,6 @@ package shared;
 
 import java.io.*;
 
-/**
- * TODO: implement this
- */
 public class Protocol implements IProtocol {
 
     public static final int MAX_BODY_BYTES = 200_000;

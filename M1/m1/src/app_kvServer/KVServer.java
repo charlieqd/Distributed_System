@@ -237,68 +237,6 @@ public class KVServer extends Thread implements IKVServer {
 
     @Override
     public int getPort() {
-        // TODO Auto-generated method stub
-        return -1;
-    }
-
-    @Override
-    public String getHostname() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public CacheStrategy getCacheStrategy() {
-        // TODO Auto-generated method stub
-        return IKVServer.CacheStrategy.None;
-    }
-
-    @Override
-    public int getCacheSize() {
-        // TODO Auto-generated method stub
-        return -1;
-    }
-
-    @Override
-    public boolean inStorage(String key) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean inCache(String key) {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public String getKV(String key) throws Exception {
-        // TODO Auto-generated method stub
-        return "";
-    }
-
-    @Override
-    public void putKV(String key, String value) throws Exception {
-        // TODO Auto-generated method stub
-    }
-
-    @Override
-    public void clearCache() {
-        // TODO Auto-generated method stub
-    }
-
-    @Override
-    public void clearStorage() {
-        // TODO Auto-generated method stub
-    }
-
-    @Override
-    public void kill() {
-        // TODO Auto-generated method stub
-    }
-
-    @Override
-    public void close() {
-        // TODO Auto-generated method stub
+        return this.port;
     }
 }

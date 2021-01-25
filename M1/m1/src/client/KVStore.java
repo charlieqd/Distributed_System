@@ -96,7 +96,6 @@ public class KVStore implements KVCommInterface {
 
 
     public KVStore(String address, int port) throws IOException {
-        // TODO Auto-generated method stub
         serverAddress = address;
         serverPort = port;
         nextId = 0;

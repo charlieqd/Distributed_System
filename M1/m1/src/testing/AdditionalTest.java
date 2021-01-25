@@ -20,7 +20,6 @@ import static org.junit.Assert.assertNull;
 
 public class AdditionalTest {
 
-    // TODO add your test cases, at least 3
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 

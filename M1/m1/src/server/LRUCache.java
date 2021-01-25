@@ -45,7 +45,7 @@ public class LRUCache<K, V> implements Cache<K, V> {
             addNode(node);
             return node.value;
         }
-        return null; //TODO: what if value is null?
+        return null;
     }
 
     @Override
