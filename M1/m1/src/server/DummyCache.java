@@ -19,4 +19,8 @@ public class DummyCache<K, V> implements Cache<K, V> {
     @Override
     public void put(K key, V value) {
     }
+
+    @Override
+    public void clear() {
+    }
 }

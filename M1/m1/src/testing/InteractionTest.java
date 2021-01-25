@@ -15,20 +15,20 @@ import static org.junit.Assert.assertTrue;
 
 public class InteractionTest {
 
-    private KVStore kvClient;
+    private KVStore kvStore;
 
     @Before
     public void setUp() throws IOException {
-        kvClient = new KVStore("localhost", 50000);
+        kvStore = new KVStore("localhost", 50000);
         try {
-            kvClient.connect();
+            kvStore.connect();
         } catch (Exception e) {
         }
     }
 
     @After
     public void tearDown() {
-        kvClient.disconnect();
+        kvStore.disconnect();
     }
 
     @Test
@@ -39,7 +39,7 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            response = kvClient.put(key, value);
+            response = kvStore.put(key, value);
         } catch (Exception e) {
             ex = e;
         }
@@ -50,13 +50,13 @@ public class InteractionTest {
 
     @Test
     public void testPutDisconnected() {
-        kvClient.disconnect();
+        kvStore.disconnect();
         String key = "foo";
         String value = "bar";
         Exception ex = null;
 
         try {
-            kvClient.put(key, value);
+            kvStore.put(key, value);
         } catch (Exception e) {
             ex = e;
         }
@@ -74,8 +74,8 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            kvClient.put(key, initialValue);
-            response = kvClient.put(key, updatedValue);
+            kvStore.put(key, initialValue);
+            response = kvStore.put(key, updatedValue);
 
         } catch (Exception e) {
             ex = e;
@@ -94,8 +94,8 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            kvClient.put(key, value);
-            response = kvClient.put(key, null);
+            kvStore.put(key, value);
+            response = kvStore.put(key, null);
 
         } catch (Exception e) {
             ex = e;
@@ -131,8 +131,8 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            kvClient.put(key, value);
-            response = kvClient.get(key);
+            kvStore.put(key, value);
+            response = kvStore.get(key);
         } catch (Exception e) {
             ex = e;
         }
@@ -147,7 +147,7 @@ public class InteractionTest {
         Exception ex = null;
 
         try {
-            response = kvClient.get(key);
+            response = kvStore.get(key);
         } catch (Exception e) {
             ex = e;
         }

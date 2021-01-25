@@ -6,6 +6,9 @@ import java.io.*;
  * TODO: implement this
  */
 public class Protocol implements IProtocol {
+
+    public static final int MAX_BODY_BYTES = 200_000;
+
     @Override
     public Request readRequest(InputStream input) throws IOException {
         DataInputStream stream = new DataInputStream(input);
@@ -15,6 +18,10 @@ public class Protocol implements IProtocol {
 
         id = stream.readInt();
         bodySize = stream.readInt();
+        if (bodySize > MAX_BODY_BYTES) {
+            throw new IOException("Unexpectedly large message body size");
+        }
+
         body = new byte[bodySize];
         stream.readFully(body);
 
@@ -70,6 +77,10 @@ public class Protocol implements IProtocol {
         id = stream.readInt();
         status = stream.readInt();
         bodySize = stream.readInt();
+        if (bodySize > MAX_BODY_BYTES) {
+            throw new IOException("Unexpectedly large message body size");
+        }
+
         body = new byte[bodySize];
         stream.readFully(body);
 

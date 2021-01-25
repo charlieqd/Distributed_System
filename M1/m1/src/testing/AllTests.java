@@ -29,7 +29,7 @@ public class AllTests {
             new LogSetup("logs/testing/test.log", Level.ERROR);
             new KVServer(
                     new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
-                            1024, IKVServer.CacheStrategy.FIFO), new Protocol(),
+                            1024, IKVServer.CacheStrategy.LRU), new Protocol(),
                     new KVMessageSerializer(), 50000).start();
         } catch (Exception e) {
             e.printStackTrace();

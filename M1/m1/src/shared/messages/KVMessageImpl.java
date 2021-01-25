@@ -6,6 +6,9 @@ public class KVMessageImpl implements KVMessage, Serializable {
 
     private static final long serialVersionUID = 966087689327304835L;
 
+    public static final int MAX_KEY_LENGTH = 20;
+    public static final int MAX_VALUE_LENGTH = 120_000;
+
     private String key;
     private String value;
     private StatusType status;
@@ -40,6 +43,8 @@ public class KVMessageImpl implements KVMessage, Serializable {
         String statusName = status.name();
 
         switch (status) {
+            case DISCONNECT:
+                return statusName;
             case GET:
                 return statusName + "<" + key + ">";
             case GET_ERROR:

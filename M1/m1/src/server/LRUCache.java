@@ -77,4 +77,13 @@ public class LRUCache<K, V> implements Cache<K, V> {
         tail.prev = node;
         node.next = tail;
     }
+
+    @Override
+    public void clear() {
+        this.dic.clear();
+        this.head = new Node<>(null, null);
+        this.tail = new Node<>(null, null);
+        head.next = tail;
+        tail.prev = head;
+    }
 }

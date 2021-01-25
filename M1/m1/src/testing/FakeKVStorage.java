@@ -31,4 +31,8 @@ public class FakeKVStorage implements IKVStorage {
             }
         }
     }
+
+    @Override
+    public void clearCache() {
+    }
 }
