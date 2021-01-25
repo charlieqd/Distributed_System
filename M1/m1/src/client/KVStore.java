@@ -172,7 +172,7 @@ public class KVStore implements KVCommInterface {
             nextId += 1;
             return id;
         } catch (IOException e) {
-            logger.error("Unable to send message! Disconnected!");
+            logger.warn("Unable to send message! Disconnected!");
             disconnect();
             throw e;
         }
