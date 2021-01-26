@@ -15,6 +15,9 @@ public class Protocol implements IProtocol {
 
         id = stream.readInt();
         bodySize = stream.readInt();
+        if (bodySize < 0) {
+            throw new IOException("Negative body size");
+        }
         if (bodySize > MAX_BODY_BYTES) {
             throw new IOException("Unexpectedly large message body size");
         }
@@ -74,6 +77,9 @@ public class Protocol implements IProtocol {
         id = stream.readInt();
         status = stream.readInt();
         bodySize = stream.readInt();
+        if (bodySize < 0) {
+            throw new IOException("Negative body size");
+        }
         if (bodySize > MAX_BODY_BYTES) {
             throw new IOException("Unexpectedly large message body size");
         }
