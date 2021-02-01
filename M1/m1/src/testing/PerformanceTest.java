@@ -129,7 +129,8 @@ public class PerformanceTest {
         float averageLatency =
                 numResponses == 0 ? 0 :
                         ((float) latencySum) / 1000 / numResponses;
-        float throughput = ((float) numResponses) / TOTAL_DURATION_MILLIS * 1000;
+        float throughput = ((float) numResponses) /
+                (TOTAL_DURATION_MILLIS - WARM_UP_TIME_MILLIS) * 1000;
 
         System.out.println(
                 "Average latency (seconds): " + averageLatency +
