@@ -7,6 +7,7 @@ import shared.Response;
 import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
+import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +34,7 @@ public class ServerConnection {
     private BlockingQueue<Response> watcherQueue;
     private String address;
     private int port;
+    private KVMessageSerializer serializer;
 
     private int nextId = 0;
 
@@ -40,19 +42,21 @@ public class ServerConnection {
                             ISerializer<KVMessage> serializer,
                             BlockingQueue<Response> watcherQueue,
                             String address,
-                            int port) {
+                            int port,
+                            KVMessageSerializer serializer;) {
         this.protocol = protocol;
         this.serializer = serializer;
         this.watcherQueue = watcherQueue;
         this.address = address;
         this.port = port;
+        this.serializer = serializer;
     }
 
     public boolean isConnectionValid() {
         return running && !terminated.get();
     }
 
-    public void connect() throws Exception {
+    public Metadata connect() throws Exception {
         if (running) {
             throw new IllegalStateException("Already connected");
         }
@@ -70,11 +74,14 @@ public class ServerConnection {
         }
 
         running = true;
-
+        Metadata metaData = null;
         try {
             Response res = protocol.readResponse(input);
             int status = res.getStatus();
             if (status == Response.Status.CONNECTION_ESTABLISHED) {
+                byte[] msgByte = res.getBody();
+                KVMessage message = serializer.decode(msgByte);
+                metaData = message.getMetaData();
                 logger.info("Connection Established!");
             } else {
                 logger.error("Connection Error!");
@@ -93,6 +100,7 @@ public class ServerConnection {
         watcher = new Thread(
                 new SocketWatcher(protocol, watcherQueue, this));
         watcher.start();
+        return metaData;
     }
 
     public void disconnect() {
