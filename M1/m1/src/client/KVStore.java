@@ -59,6 +59,7 @@ public class KVStore implements KVCommInterface {
     public void connect() throws Exception {
         ServerConnection connection = new ServerConnection(protocol, watcherQueue,serverAddress, serverPort, serializer);
         metaData = connection.connect();
+        connections.put("", connection);
         throw new Error("Not implemented");
     }
 
