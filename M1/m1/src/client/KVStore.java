@@ -34,7 +34,7 @@ public class KVStore implements KVCommInterface {
     public BlockingQueue<Response> watcherQueue = new LinkedBlockingQueue<>();
 
     private Map<String, ServerConnection> connections = new HashMap<>();
-
+    Metadata metaData = null;
 
     public KVStore(String address, int port) throws IOException {
         serverAddress = address;
@@ -57,12 +57,16 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public void connect() throws Exception {
+        ServerConnection connection = new ServerConnection(protocol, watcherQueue,serverAddress, serverPort, serializer);
+        metaData = connection.connect();
         throw new Error("Not implemented");
     }
 
     @Override
     public void disconnect() {
-        throw new Error("Not implemented");
+        for(ServerConnection connection : connections.values()){
+            connection.disconnect();
+        }
     }
 
     @Override
