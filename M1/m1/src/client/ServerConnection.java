@@ -2,6 +2,7 @@ package client;
 
 import org.apache.log4j.Logger;
 import shared.IProtocol;
+import shared.ISerializer;
 import shared.Response;
 import shared.Util;
 import shared.messages.KVMessage;
@@ -28,15 +29,20 @@ public class ServerConnection {
     public boolean running;
 
     private IProtocol protocol;
+    private ISerializer<KVMessage> serializer;
     private BlockingQueue<Response> watcherQueue;
     private String address;
     private int port;
 
+    private int nextId = 0;
+
     public ServerConnection(IProtocol protocol,
+                            ISerializer<KVMessage> serializer,
                             BlockingQueue<Response> watcherQueue,
                             String address,
                             int port) {
         this.protocol = protocol;
+        this.serializer = serializer;
         this.watcherQueue = watcherQueue;
         this.address = address;
         this.port = port;
@@ -122,12 +128,12 @@ public class ServerConnection {
         }
     }
 
-    private KVMessage receiveMessage(int requestID) throws Exception {
+    public KVMessage receiveMessage(int requestID) throws Exception {
         while (true) {
             Response res = watcherQueue
                     .poll(SOCKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (res == null) {
-                return new KVMessageImpl(null, "Reqeust timed out.",
+                return new KVMessageImpl(null, "Request timed out.",
                         KVMessage.StatusType.FAILED);
             }
 
@@ -166,8 +172,8 @@ public class ServerConnection {
     /**
      * Return the ID of the request sent. If request failed to send, return -1.
      */
-    private int sendRequest(String key, String value,
-                            KVMessage.StatusType status) throws IOException {
+    public int sendRequest(String key, String value,
+                           KVMessage.StatusType status) throws IOException {
         try {
             KVMessage kvMsg = new KVMessageImpl(key, value, status);
             logger.info("Sending message: " + kvMsg.toString());

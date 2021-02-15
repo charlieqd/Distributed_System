@@ -46,8 +46,8 @@ public class KVStore implements KVCommInterface {
     }
 
     public boolean isConnectionValid() {
-        throw new Error("Not implemented");
-        for (ServerConnection connection : connections) {
+        for (String ringPosition : connections.keySet()) {
+            ServerConnection connection = connections.get(ringPosition);
             if (connection.isConnectionValid()) {
                 return true;
             }
@@ -67,21 +67,47 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public KVMessage put(String key, String value) throws Exception {
-        int id = sendRequest(key, value, KVMessage.StatusType.PUT);
-        if (id < 0) {
-            return new KVMessageImpl(null, "Failed to send request.",
-                    KVMessage.StatusType.FAILED);
-        }
-        return receiveMessage(id);
+        return sendRequest(key, value, KVMessage.StatusType.PUT);
     }
 
     @Override
     public KVMessage get(String key) throws Exception {
-        int id = sendRequest(key, null, KVMessage.StatusType.GET);
-        if (id < 0) {
-            return new KVMessageImpl(null, "Failed to send request.",
-                    KVMessage.StatusType.FAILED);
+        return sendRequest(key, null, KVMessage.StatusType.GET);
+    }
+
+    private KVMessage sendRequest(String key,
+                                  String value,
+                                  KVMessage.StatusType status) throws
+            Exception {
+        while (true) {
+            ServerConnection connection = getOrCreateServerConnection(key);
+            int id = connection.sendRequest(
+                    key, value, status);
+            if (id < 0) {
+                return new KVMessageImpl(null, "Failed to send request.",
+                        KVMessage.StatusType.FAILED);
+            }
+            KVMessage message = connection.receiveMessage(id);
+            KVMessage.StatusType resStatus = message.getStatus();
+            if (resStatus == KVMessage.StatusType.NOT_RESPONSIBLE) {
+                // TODO
+                processNewMetadata(message.getMetadata());
+                continue;
+            }
+            return message;
         }
-        return receiveMessage(id);
+    }
+
+    /**
+     * Obtain the server connection for the given key using current metadata. If
+     * a connection to the target server does not exist, a new connection will
+     * be established. If this method fails to establish new connection.
+     */
+    private ServerConnection getOrCreateServerConnection(String key) {
+        throw new Error("Not implemented");
+    }
+
+    private void processNewMetadata(Metadata metadata) {
+        throw new Error("Not implemented");
     }
 }
