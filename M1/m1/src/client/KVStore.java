@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -22,22 +24,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class KVStore implements KVCommInterface {
 
+    private static class ServerConnection {
+        private BlockingQueue<Response> watcherQueue = new LinkedBlockingQueue<>();
+        private Thread watcher = null;
+        private final AtomicBoolean terminated = new AtomicBoolean(false);
+    }
+
     private static class SocketWatcher implements Runnable {
         private Logger logger = Logger.getRootLogger();
 
         private IProtocol protocol;
         private KVStore store;
         private InputStream socketInput;
-        private BlockingQueue<Response> queue;
+        private ServerConnection connection;
 
         public SocketWatcher(IProtocol protocol,
                              KVStore store,
                              InputStream socketInput,
-                             BlockingQueue<Response> queue) {
+                             ServerConnection connection) {
             this.protocol = protocol;
             this.store = store;
             this.socketInput = socketInput;
-            this.queue = queue;
+            this.connection = connection;
         }
 
         @Override
@@ -45,17 +53,18 @@ public class KVStore implements KVCommInterface {
             while (true) {
                 try {
                     Response res = protocol.readResponse(socketInput);
-                    queue.put(res);
+                    connection.watcherQueue.put(res);
                 } catch (IOException | InterruptedException e) {
                     logger.info("Socket closed.");
                     try {
-                        queue.put(new Response(new byte[0], -1,
-                                Response.Status.DISCONNECTED));
+                        connection.watcherQueue
+                                .put(new Response(new byte[0], -1,
+                                        Response.Status.DISCONNECTED));
                     } catch (InterruptedException interruptedException) {
                         logger.error(
                                 Util.getStackTraceString(interruptedException));
                     }
-                    store.connectionTerminated.set(true);
+                    connection.terminated.set(true);
                     store.notifyStatusChange(
                             KVStoreListener.SocketStatus.DISCONNECTED);
                     break;
@@ -89,10 +98,7 @@ public class KVStore implements KVCommInterface {
     private KVMessageSerializer serializer;
     private Protocol protocol;
 
-    private BlockingQueue<Response> watcherQueue;
-
-    private Thread watcher = null;
-    private final AtomicBoolean connectionTerminated;
+    private List<ServerConnection> connections = new ArrayList<>();
 
 
     public KVStore(String address, int port) throws IOException {
@@ -107,7 +113,14 @@ public class KVStore implements KVCommInterface {
     }
 
     public boolean isConnectionValid() {
-        return running && !connectionTerminated.get();
+        if (!running) return false;
+
+        for (ServerConnection connection : connections) {
+            if (!connection.terminated.get()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private KVMessage receiveMessage(int requestID) throws Exception {
