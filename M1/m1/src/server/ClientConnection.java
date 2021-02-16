@@ -117,6 +117,12 @@ public class ClientConnection implements Runnable {
         }
     }
 
+    private KVMessage handleNotServing(){
+        KVMessage responseMessage = new KVMessageImpl(null, "Server Stopped",
+                KVMessage.StatusType.SERVER_STOPPED);
+        return responseMessage;
+    }
+
     private void handleMessage(OutputStream output,
                                Request request,
                                KVMessage requestMessage) throws IOException {
@@ -125,65 +131,105 @@ public class ClientConnection implements Runnable {
 
         switch (requestMessage.getStatus()) {
             case DISCONNECT: {
-                isOpen = false;
-                logger.info("Client disconnected \t<"
-                        + clientSocket.getInetAddress()
-                        .getHostAddress() + ":"
-                        + clientSocket.getPort() + ">");
-                return;
+                if(!server.servering.get()){
+                    responseMessage = handleNotServing();
+                }else{
+                    isOpen = false;
+                    logger.info("Client disconnected \t<"
+                            + clientSocket.getInetAddress()
+                            .getHostAddress() + ":"
+                            + clientSocket.getPort() + ">");
+                    return;
+                }
             }
 
             case GET: {
-                String key = requestMessage.getKey();
-                if (key == null) {
-                    responseMessage = new KVMessageImpl(null, "Invalid key",
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
-                String value;
-                try {
-                    value = storage.get(key);
-                } catch (IOException e) {
-                    responseMessage = new KVMessageImpl(null,
-                            "Internal server error: " +
-                                    Util.getStackTraceString(e),
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
-                if (value == null) {
-                    responseMessage = new KVMessageImpl(key, null,
-                            KVMessage.StatusType.GET_ERROR);
-                    break;
-                } else {
-                    responseMessage = new KVMessageImpl(key, value,
-                            KVMessage.StatusType.GET_SUCCESS);
-                    break;
+                if(!server.servering.get()){
+                    responseMessage = handleNotServing();
+                }else {
+                    String key = requestMessage.getKey();
+                    if (key == null) {
+                        responseMessage = new KVMessageImpl(null, "Invalid key",
+                                KVMessage.StatusType.FAILED);
+                        break;
+                    }
+                    String value;
+                    try {
+                        value = storage.get(key);
+                    } catch (IOException e) {
+                        responseMessage = new KVMessageImpl(null,
+                                "Internal server error: " +
+                                        Util.getStackTraceString(e),
+                                KVMessage.StatusType.FAILED);
+                        break;
+                    }
+                    if (value == null) {
+                        responseMessage = new KVMessageImpl(key, null,
+                                KVMessage.StatusType.GET_ERROR);
+                        break;
+                    } else {
+                        responseMessage = new KVMessageImpl(key, value,
+                                KVMessage.StatusType.GET_SUCCESS);
+                        break;
+                    }
                 }
             }
 
             case PUT: {
-                String key = requestMessage.getKey();
-                String value = requestMessage.getValue();
-                if (key == null) {
-                    responseMessage = new KVMessageImpl(null, "Invalid key",
-                            KVMessage.StatusType.FAILED);
+                if(!server.servering.get()){
+                    responseMessage = handleNotServing();
+                }else {
+                    String key = requestMessage.getKey();
+                    String value = requestMessage.getValue();
+                    if (key == null) {
+                        responseMessage = new KVMessageImpl(null, "Invalid key",
+                                KVMessage.StatusType.FAILED);
+                        break;
+                    }
+
+                    KVMessage.StatusType putResponseType;
+                    try {
+                        putResponseType = storage.put(key, value);
+                    } catch (IOException e) {
+                        responseMessage = new KVMessageImpl(null,
+                                "Internal server error: " +
+                                        Util.getStackTraceString(e),
+                                KVMessage.StatusType.FAILED);
+                        break;
+                    }
+
+                    responseMessage = new KVMessageImpl(key, value,
+                            putResponseType);
                     break;
                 }
+            }
 
-                KVMessage.StatusType putResponseType;
-                try {
-                    putResponseType = storage.put(key, value);
-                } catch (IOException e) {
-                    responseMessage = new KVMessageImpl(null,
-                            "Internal server error: " +
-                                    Util.getStackTraceString(e),
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
+            case ECS_START_SERVING: {
 
-                responseMessage = new KVMessageImpl(key, value,
-                        putResponseType);
-                break;
+            }
+
+            case ECS_STOP_SERVING: {
+
+            }
+
+            case ECS_SHUT_DOWN: {
+
+            }
+
+            case ECS_LOCK_WRITE: {
+
+            }
+
+            case ECS_UNLOCK_WRITE: {
+
+            }
+
+            case ECS_MOVE_DATA: {
+
+            }
+
+            case ECS_UPDATE_METADATA: {
+
             }
 
             default: {
@@ -200,6 +246,8 @@ public class ClientConnection implements Runnable {
                     + clientSocket.getInetAddress()
                     .getHostAddress() + ":"
                     + clientSocket.getPort() + ">: null");
+        } else if(!server.servering.get()){
+            logger.info("Server Stopped");
         } else {
             logger.info("SEND \t<"
                     + clientSocket.getInetAddress()
