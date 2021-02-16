@@ -20,11 +20,14 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
 
     private static Logger logger = Logger.getRootLogger();
-
+    public final AtomicBoolean servering = new AtomicBoolean(false);
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
@@ -37,8 +40,11 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
+    private final Lock writeLock;
 
     private final ZooKeeperService zooKeeperService;
+
+    private String name;
 
     /**
      * Start KV Server at given port
@@ -51,13 +57,15 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
     public KVServer(IKVStorage storage,
                     IProtocol protocol,
                     ISerializer<KVMessage> messageSerializer,
-                    int port, ZooKeeperService zooKeeperService) {
+                    int port, String name, ZooKeeperService zooKeeperService) {
+        this.name = name;
         this.storage = storage;
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
         this.port = port;
         this.zooKeeperService = zooKeeperService;
         zooKeeperService.addListener(this);
+        this.writeLock = new ReentrantLock();
     }
 
     /**
@@ -71,6 +79,8 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
         running = initializeServer();
 
         if (serverSocket != null) {
+            String node = String.format();
+            zooKeeperService.createNode(name, false, new byte[0], true);
             while (isRunning()) {
                 try {
                     Socket client = serverSocket.accept();
@@ -152,6 +162,9 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
             addOption(options, "z", "zooKeeper", true,
                     "the url of zooKeeper",
                     true);
+            addOption(options, "n", "name", true,
+                    "name of the server",
+                    true);
 
             int port;
             int cacheSize;
@@ -160,6 +173,7 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
             Level logLevel;
             String rootPath;
             String url;
+            String name;
 
             try {
                 if (args.length == 1 &&
@@ -202,6 +216,7 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
                         .toLevel(cmd.getOptionValue("l", DEFAULT_LOG_LEVEL));
 
                 url = cmd.getOptionValue("z");
+                name = cmd.getOptionValue("n");
             } catch (Exception e) {
                 e.printStackTrace();
                 formatter.printHelp("m1-server", options);
@@ -228,7 +243,7 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
             ZooKeeperService zooKeeperService = new ZooKeeperService(url);
 
             new KVServer(storage, protocol, messageSerializer, port,
-                    zooKeeperService)
+                    name, zooKeeperService)
                     .start();
 
         } catch (IOException e) {
@@ -261,7 +276,9 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * processed.
      */
     public void startServing() {
-        throw new Error("Not implemented");
+        //After the server has been initialized,
+        //the ECS can start the server (call start()).
+        servering.set(true);
     }
 
     /**
@@ -269,28 +286,30 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * requests are processed.
      */
     public void stopServing() {
-        throw new Error("Not implemented");
+        servering.set(false);
     }
 
     /**
      * Exits the KVServer application.
      */
     public void shutDown() {
-        throw new Error("Not implemented");
+        // close the big socket
+        stopServer();
     }
 
     /**
      * Lock the KVServer for write operations.
      */
     public void lockWrite() {
-        throw new Error("Not implemented");
+        // create a lock and add check in kvstorage
+        writeLock.lock();
     }
 
     /**
      * Unlock the KVServer for write operations.
      */
     public void unlockWrite() {
-        throw new Error("Not implemented");
+        writeLock.unlock();
     }
 
     /**
