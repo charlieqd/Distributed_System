@@ -15,7 +15,6 @@ import java.util.Map;
 public class ECSClient implements IECSClient {
 
     private ArrayList<ECSNode> servers;
-    private ArrayList<ECSNode> serversAdded;
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECS Client> ";
     private final InputStream input;
@@ -154,17 +153,24 @@ public class ECSClient implements IECSClient {
             stop = true;
             shutdown();
             System.out.println("Application exit!");
-
         } else if (tokens[0].equals("start")) {
             if (tokens.length == 1) {
-
+                start();
+            } else {
+                printError("Invalid number of parameters!");
+            }
+         }else if (tokens[0].equals("stop")) {
+            if (tokens.length == 1) {
+                stop();
             } else {
                 printError("Invalid number of parameters!");
             }
         } else if (tokens[0].equals("addNodes")) {
             if (tokens.length == 1) {
                 int nodesNum = Integer.parseInt(tokens[1]);
-
+                String cacheStrategy = tokens[2];
+                int cacheSize = Integer.parseInt(tokens[3]);
+                addNodes(nodesNum, cacheStrategy, cacheSize);
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -183,7 +189,10 @@ public class ECSClient implements IECSClient {
             }
 
         } else if (tokens[0].equals("addNode")) {
-            if (tokens.length == 1) {
+            if (tokens.length == 3) {
+                String cacheStrategy = tokens[1];
+                int cacheSize = Integer.parseInt(tokens[2]);
+                addNode(cacheStrategy, cacheSize);
                 System.out.println("Add node");
             } else {
                 printError("Invalid number of parameters!");
@@ -191,15 +200,10 @@ public class ECSClient implements IECSClient {
 
         } else if (tokens[0].equals("removeNode")) {
             if (tokens.length == 2) {
-                if (connectionValid()) {
-                    String key = tokens[1];
-                } else {
-                    printError("Not connected or connection stopped!");
-                }
+                //To do
             } else {
                 printError("Invalid number of parameters!");
             }
-
         } else if (tokens[0].equals("help")) {
             printHelp();
         } else {
@@ -219,16 +223,16 @@ public class ECSClient implements IECSClient {
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
         sb.append("start");
-        sb.append("\t establishes a connection to a server\n");
-        sb.append("Add Nodes");
-        sb.append("\t\t get the value from the server \n");
+        sb.append("\t Starts the storage service\n");
+        sb.append("addNodes(int numberOfNodes)");
+        sb.append("\t\t Randomly choose <numberOfNodes> servers from the available machines and start the Servers. \n");
         sb.append("add node <key> [<value>]");
         sb.append(
-                "\t insert or update a tuple. if value is not given, delete the tuple. \n");
-        sb.append("remove Nodes <key>");
-        sb.append("\t\t delete the tuple from the server \n");
+                "\t Create a new KVServer and add it to the storage service. \n");
+        sb.append("removeNode(<index of server>)");
+        sb.append("\t\t Remove a server from the storage service \n");
         sb.append("shut down");
-        sb.append("\t\t disconnects from the server \n");
+        sb.append("\t\t Stops all server instances and exits the remote processes. \n");
 
         sb.append("logLevel");
         sb.append("\t\t changes the logLevel \n");
@@ -236,7 +240,7 @@ public class ECSClient implements IECSClient {
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
 
         sb.append("stop");
-        sb.append("\t\t\t exits the program");
+        sb.append("\t\t\t Stops the service");
         System.out.println(sb.toString());
     }
 
@@ -262,12 +266,18 @@ public class ECSClient implements IECSClient {
     }
 
     public static void main(String[] args) throws Exception {
-        // TODO
-        // read config into a list of serverInfo
-        String fileName = args[0];
-        ArrayList<ECSNode> servers = readConfig(fileName);
-        ECSClient ecsApp = new ECSClient(System.in, servers);
-        ecsApp.run();
+        try{
+            new LogSetup("logs/client.log", Level.OFF);
+            String fileName = args[0];
+            ArrayList<ECSNode> servers = readConfig(fileName);
+            ECSClient ecsApp = new ECSClient(System.in, servers);
+            ecsApp.run();
+        } catch (IOException e) {
+            System.out.println("Error! Unable to initialize logger!");
+            e.printStackTrace();
+            System.exit(1);
+        }
+
 
 
     }
