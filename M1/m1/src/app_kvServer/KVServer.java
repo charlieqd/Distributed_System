@@ -17,11 +17,12 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class KVServer extends Thread implements IKVServer {
 
     private static Logger logger = Logger.getRootLogger();
-
+    public final AtomicBoolean servering = new AtomicBoolean(false);
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
@@ -64,6 +65,8 @@ public class KVServer extends Thread implements IKVServer {
         running = initializeServer();
 
         if (serverSocket != null) {
+            // is running and not serving, will connect and return server_stopped response
+            //? where atomic boolean from server or clientconnection?
             while (isRunning()) {
                 try {
                     Socket client = serverSocket.accept();
@@ -246,6 +249,7 @@ public class KVServer extends Thread implements IKVServer {
      * processed.
      */
     public void startServing() {
+        servering.set(true);
         throw new Error("Not implemented");
     }
 
@@ -254,6 +258,7 @@ public class KVServer extends Thread implements IKVServer {
      * requests are processed.
      */
     public void stopServing() {
+        servering.set(false);
         throw new Error("Not implemented");
     }
 
