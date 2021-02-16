@@ -1,7 +1,6 @@
 package app_kvECS;
 
 import logger.LogSetup;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import shared.ECSNode;
 import shared.messages.IECSNode;
@@ -9,8 +8,8 @@ import shared.messages.IECSNode;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ECSClient implements IECSClient {
 
@@ -27,6 +26,11 @@ public class ECSClient implements IECSClient {
     public ECSClient(InputStream inputStream, ArrayList<ECSNode> servers) {
         this.input = inputStream;
         this.servers = servers;
+        ArrayList<ECSNode> availableToAdd = new ArrayList<>();
+        for (ECSNode s : servers) {
+            availableToAdd.add(s);
+        }
+        this.availableToAdd = availableToAdd;
     }
 
     @Override
@@ -49,7 +53,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        // TODO
         if (availableToAdd.isEmpty()) {
             String msg = "No node is available to add.";
             logger.error(msg);
@@ -58,11 +61,12 @@ public class ECSClient implements IECSClient {
         }
 
         Process proc;
-        int elementToPop = availableToAdd.size() - 1;
-        ECSNode node = availableToAdd.get(elementToPop);
+        int randomNum = ThreadLocalRandom.current()
+                .nextInt(0, availableToAdd.size());
+        ECSNode node = availableToAdd.get(randomNum);
         String script = String
-                .format("invoke_server.sh %s %s", node.getNodeHost(),
-                        node.getNodePort());
+                .format("invoke_server.sh %s %s %s %d", node.getNodeHost(),
+                        node.getNodePort(), cacheStrategy, cacheSize);
 
         Runtime run = Runtime.getRuntime();
         try {
@@ -78,8 +82,8 @@ public class ECSClient implements IECSClient {
             return null;
         }
 
-        availableToAdd.remove(elementToPop);
-        return servers.get(elementToPop);
+        availableToAdd.remove(randomNum);
+        return servers.get(randomNum);
     }
 
     @Override
@@ -134,7 +138,8 @@ public class ECSClient implements IECSClient {
         return null;
     }
 
-    public static ArrayList<ECSNode> readConfig(String fileName) throws IOException {
+    public static ArrayList<ECSNode> readConfig(String fileName) throws
+            IOException {
         ArrayList<ECSNode> servers = new ArrayList<>();
         BufferedReader br = null;
         try {
@@ -263,7 +268,8 @@ public class ECSClient implements IECSClient {
             } catch (IOException e) {
                 stop = true;
                 logger.error("Failed to read from command line", e);
-                printError("ECS Client does not respond - Application terminated ");
+                printError(
+                        "ECS Client does not respond - Application terminated ");
             }
 
             System.out.println("");
