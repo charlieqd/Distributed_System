@@ -24,7 +24,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class KVServer extends Thread implements IKVServer {
 
     private static Logger logger = Logger.getRootLogger();
-    public final AtomicBoolean servering = new AtomicBoolean(false);
+    public final AtomicBoolean serving = new AtomicBoolean(false);
+    public final AtomicBoolean writing = new AtomicBoolean(false);
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
@@ -37,7 +38,6 @@ public class KVServer extends Thread implements IKVServer {
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
-    private final Lock writeLock;
 
     /**
      * Start KV Server at given port
@@ -55,7 +55,6 @@ public class KVServer extends Thread implements IKVServer {
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
         this.port = port;
-        this.writeLock = new ReentrantLock();
     }
 
     /**
@@ -253,7 +252,7 @@ public class KVServer extends Thread implements IKVServer {
     public void startServing() {
         //After the server has been initialized,
         //the ECS can start the server (call start()).
-        servering.set(true);
+        serving.set(true);
     }
 
     /**
@@ -261,7 +260,7 @@ public class KVServer extends Thread implements IKVServer {
      * requests are processed.
      */
     public void stopServing() {
-        servering.set(false);
+        serving.set(false);
     }
 
     /**
@@ -277,14 +276,14 @@ public class KVServer extends Thread implements IKVServer {
      */
     public void lockWrite() {
         // create a lock and add check in kvstorage
-        writeLock.lock();
+        writing.set(true);
     }
 
     /**
      * Unlock the KVServer for write operations.
      */
     public void unlockWrite() {
-        writeLock.unlock();
+        writing.set(false);
     }
 
     /**

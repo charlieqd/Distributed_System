@@ -131,8 +131,9 @@ public class ClientConnection implements Runnable {
 
         switch (requestMessage.getStatus()) {
             case DISCONNECT: {
-                if(!server.servering.get()){
+                if(!server.serving.get()){
                     responseMessage = handleNotServing();
+                    break;
                 }else{
                     isOpen = false;
                     logger.info("Client disconnected \t<"
@@ -144,8 +145,9 @@ public class ClientConnection implements Runnable {
             }
 
             case GET: {
-                if(!server.servering.get()){
+                if(!server.serving.get()){
                     responseMessage = handleNotServing();
+                    break;
                 }else {
                     String key = requestMessage.getKey();
                     if (key == null) {
@@ -176,7 +178,7 @@ public class ClientConnection implements Runnable {
             }
 
             case PUT: {
-                if(!server.servering.get()){
+                if(!server.serving.get()){
                     responseMessage = handleNotServing();
                 }else {
                     String key = requestMessage.getKey();
@@ -200,16 +202,32 @@ public class ClientConnection implements Runnable {
 
                     responseMessage = new KVMessageImpl(key, value,
                             putResponseType);
-                    break;
                 }
+                break;
             }
 
             case ECS_START_SERVING: {
-
+                try {
+                    server.startServing();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_STOP_SERVING: {
-
+                try {
+                    server.stopServing();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_SHUT_DOWN: {
@@ -246,7 +264,7 @@ public class ClientConnection implements Runnable {
                     + clientSocket.getInetAddress()
                     .getHostAddress() + ":"
                     + clientSocket.getPort() + ">: null");
-        } else if(!server.servering.get()){
+        } else if(!server.serving.get()){
             logger.info("Server Stopped");
         } else {
             logger.info("SEND \t<"
