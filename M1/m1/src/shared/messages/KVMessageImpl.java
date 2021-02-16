@@ -1,5 +1,7 @@
 package shared.messages;
 
+import shared.Metadata;
+
 import java.io.Serializable;
 
 public class KVMessageImpl implements KVMessage, Serializable {
@@ -11,9 +13,20 @@ public class KVMessageImpl implements KVMessage, Serializable {
 
     private String key;
     private String value;
+    private Metadata metadata;
     private StatusType status;
 
     public KVMessageImpl(String key, String value, StatusType status) {
+        this.key = key;
+        this.value = value;
+        this.metadata = null;
+        this.status = status;
+    }
+
+    public KVMessageImpl(String key,
+                         String value,
+                         Metadata metadata,
+                         StatusType status) {
         this.key = key;
         this.value = value;
         this.status = status;
@@ -27,6 +40,10 @@ public class KVMessageImpl implements KVMessage, Serializable {
     @Override
     public String getValue() {
         return value;
+    }
+
+    public Metadata getMetadata() {
+        return metadata;
     }
 
     @Override
@@ -43,6 +60,8 @@ public class KVMessageImpl implements KVMessage, Serializable {
         String statusName = status.name();
 
         switch (status) {
+            case CONNECTED:
+                return statusName + "<(metadata)>";
             case DISCONNECT:
                 return statusName;
             case GET:
@@ -63,6 +82,12 @@ public class KVMessageImpl implements KVMessage, Serializable {
                 return statusName + "<" + key + ">";
             case DELETE_ERROR:
                 return statusName + "<" + key + ">";
+            case NOT_RESPONSIBLE:
+                return statusName + "<(metadata)>";
+            case SERVER_WRITE_LOCK:
+                return statusName;
+            case SERVER_STOPPED:
+                return statusName;
             case FAILED:
                 return statusName + "<" + value + ">";
         }

@@ -220,7 +220,6 @@ public class KVClient implements IKVClient, KVStoreListener {
             kvStore = new KVStore(address, port);
             try {
                 kvStore.connect();
-                kvStore.addListener(this);
                 System.out.println("Connection established.");
             } catch (Exception e) {
                 kvStore = null;
@@ -234,7 +233,6 @@ public class KVClient implements IKVClient, KVStoreListener {
         if (kvStore != null) {
             try {
                 kvStore.disconnect();
-                kvStore.removeListener(this);
                 kvStore = null;
             } catch (Exception e) {
                 logger.error("Failed to disconnect", e);
@@ -301,6 +299,14 @@ public class KVClient implements IKVClient, KVStoreListener {
                 break;
             case DELETE_ERROR:
                 System.out.println("Tuple does not exist.");
+                break;
+            case SERVER_WRITE_LOCK:
+                System.out
+                        .println("Failed: server has locked write operations.");
+                break;
+            case SERVER_STOPPED:
+                System.out.println(
+                        "Failed: server has stopped or not yet started.");
                 break;
             case FAILED:
                 System.out.println("Failed: " + value);
