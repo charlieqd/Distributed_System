@@ -1,7 +1,7 @@
 package app_kvECS;
 
+import ecs.ECSController;
 import logger.LogSetup;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import shared.ECSNode;
 import shared.messages.IECSNode;
@@ -9,7 +9,6 @@ import shared.messages.IECSNode;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 public class ECSClient implements IECSClient {
@@ -22,11 +21,14 @@ public class ECSClient implements IECSClient {
     private BufferedReader stdin;
     private boolean stop = false;
 
+    private final ECSController controller;
+
     ArrayList<ECSNode> availableToAdd;
 
     public ECSClient(InputStream inputStream, ArrayList<ECSNode> servers) {
         this.input = inputStream;
         this.servers = servers;
+        this.controller = new ECSController();
     }
 
     @Override
@@ -121,26 +123,24 @@ public class ECSClient implements IECSClient {
         return null;
     }
 
-    public static ArrayList<ECSNode> readConfig(String fileName) throws IOException {
+    public static ArrayList<ECSNode> readConfig(String fileName) throws
+            IOException {
         ArrayList<ECSNode> servers = new ArrayList<>();
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new FileReader(fileName));
+        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] tokens = line.split(" ");
-                ECSNode server = new ECSNode(tokens[1],
-                        Integer.parseInt(tokens[2]), "");
-                servers.add(server);
+                if (tokens.length == 3) {
+                    ECSNode server = new ECSNode(tokens[0], tokens[1],
+                            Integer.parseInt(tokens[2]));
+                    servers.add(server);
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            if (br != null) {
-                br.close();
-            }
-            return servers;
         }
+        System.out.printf("%d servers found.%n", servers.size());
+        return servers;
     }
 
     public boolean connectionValid() {
@@ -150,10 +150,14 @@ public class ECSClient implements IECSClient {
     private void handleCommand(String cmdLine) throws Exception {
         String[] tokens = cmdLine.trim().split("\\s+");
 
-        if (tokens[0].equals("shut") && tokens[1].equals("down")) {
-            stop = true;
-            shutdown();
-            System.out.println("Application exit!");
+        if (tokens[0].equals("shutdown")) {
+            if (tokens.length == 1) {
+                stop = true;
+                shutdown();
+                System.out.println("Application exit!");
+            } else {
+                printError("Invalid number of parameters!");
+            }
 
         } else if (tokens[0].equals("start")) {
             if (tokens.length == 1) {
@@ -161,8 +165,16 @@ public class ECSClient implements IECSClient {
             } else {
                 printError("Invalid number of parameters!");
             }
-        } else if (tokens[0].equals("addNodes")) {
+
+        } else if (tokens[0].equals("stop")) {
             if (tokens.length == 1) {
+
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
+        } else if (tokens[0].equals("addnodes")) {
+            if (tokens.length == 2) {
                 int nodesNum = Integer.parseInt(tokens[1]);
 
             } else {
@@ -182,14 +194,14 @@ public class ECSClient implements IECSClient {
                 printError("Invalid number of parameters!");
             }
 
-        } else if (tokens[0].equals("addNode")) {
+        } else if (tokens[0].equals("addnode")) {
             if (tokens.length == 1) {
                 System.out.println("Add node");
             } else {
                 printError("Invalid number of parameters!");
             }
 
-        } else if (tokens[0].equals("removeNode")) {
+        } else if (tokens[0].equals("removenode")) {
             if (tokens.length == 2) {
                 if (connectionValid()) {
                     String key = tokens[1];
@@ -218,25 +230,22 @@ public class ECSClient implements IECSClient {
         sb.append("ECS CLIENT HELP (Usage):\n");
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
+        sb.append("addnode");
+        sb.append("\t add a single node to the system\n");
+        sb.append("addnodes <count>");
+        sb.append("\t add a given number of nodes to the system\n");
         sb.append("start");
-        sb.append("\t establishes a connection to a server\n");
-        sb.append("Add Nodes");
-        sb.append("\t\t get the value from the server \n");
-        sb.append("add node <key> [<value>]");
-        sb.append(
-                "\t insert or update a tuple. if value is not given, delete the tuple. \n");
-        sb.append("remove Nodes <key>");
-        sb.append("\t\t delete the tuple from the server \n");
-        sb.append("shut down");
-        sb.append("\t\t disconnects from the server \n");
-
+        sb.append("\t signal all servers to start serving\n");
+        sb.append("stop");
+        sb.append("\t signal all servers to stop serving\n");
+        sb.append("removenode <index>");
+        sb.append("\t remove a server from the system\n");
+        sb.append("shutdown");
+        sb.append("\t stop all server instances and exit\n");
         sb.append("logLevel");
-        sb.append("\t\t changes the logLevel \n");
+        sb.append("\t changes the logLevel \n");
         sb.append("\t\t\t ");
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
-
-        sb.append("stop");
-        sb.append("\t\t\t exits the program");
         System.out.println(sb.toString());
     }
 
@@ -250,7 +259,8 @@ public class ECSClient implements IECSClient {
             } catch (IOException e) {
                 stop = true;
                 logger.error("Failed to read from command line", e);
-                printError("ECS Client does not respond - Application terminated ");
+                printError(
+                        "ECS Client does not respond - Application terminated ");
             }
 
             System.out.println("");
@@ -264,6 +274,10 @@ public class ECSClient implements IECSClient {
     public static void main(String[] args) throws Exception {
         // TODO
         // read config into a list of serverInfo
+        if (args.length != 1) {
+            System.out.println("usage: <config-file-path>");
+            System.exit(1);
+        }
         String fileName = args[0];
         ArrayList<ECSNode> servers = readConfig(fileName);
         ECSClient ecsApp = new ECSClient(System.in, servers);
