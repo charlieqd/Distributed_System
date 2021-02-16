@@ -52,21 +52,32 @@ public class ECSClient implements IECSClient {
             String msg = "No node is available to add.";
             logger.error(msg);
             printError(msg);
+            return null;
         }
+
         Process proc;
+        int elementToPop = availableToAdd.size() - 1;
+        ECSNode node = availableToAdd.get(elementToPop);
         String script = String
-                .format("invoke_server.sh %s %s", servers.get(0).getNodeHost(),
-                        servers.get(0).getNodePort());
+                .format("invoke_server.sh %s %s", node.getNodeHost(),
+                        node.getNodePort());
 
         Runtime run = Runtime.getRuntime();
         try {
             proc = run.exec(script);
         } catch (IOException e) {
             e.printStackTrace();
-            logger.error("Failed to add nodes", e);
-            printError("Failed to add node");
+            String msg = String
+                    .format("Failed to add nodes, name: %s, host: %s, port: %s",
+                            node.getNodeName(), node.getNodeHost(),
+                            node.getNodePort());
+            logger.error(msg, e);
+            printError(msg);
+            return null;
         }
-        return null;
+
+        availableToAdd.remove(elementToPop);
+        return servers.get(elementToPop);
     }
 
     @Override
@@ -82,10 +93,12 @@ public class ECSClient implements IECSClient {
             return null;
         }
 
+        ArrayList<IECSNode> addedNodes = new ArrayList();
         for (int i = 0; i < count; i++) {
-            addNode(cacheStrategy, cacheSize);
+            addedNodes.add(addNode(cacheStrategy, cacheSize));
         }
-        return null;
+
+        return addedNodes;
     }
 
     @Override
