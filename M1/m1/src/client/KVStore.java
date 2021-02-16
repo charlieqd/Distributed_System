@@ -1,9 +1,9 @@
 package client;
 
 import org.apache.log4j.Logger;
+import shared.ECSNode;
 import shared.Metadata;
 import shared.Protocol;
-import shared.ServerInfo;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
@@ -129,9 +129,9 @@ public class KVStore implements KVCommInterface {
         String ringPosition = Metadata.getRingPosition(key);
         ServerConnection connection = null;
         if (cachedMetadata != null) {
-            ServerInfo info = cachedMetadata.getServer(ringPosition);
+            ECSNode info = cachedMetadata.getServer(ringPosition);
             if (info != null) {
-                ringPosition = info.position;
+                ringPosition = info.getPosition();
                 connection = connections.get(ringPosition);
             }
         }
@@ -171,10 +171,10 @@ public class KVStore implements KVCommInterface {
 
         if (metadata == null) return;
 
-        for (ServerInfo info : metadata.getServers()) {
+        for (ECSNode info : metadata.getServers()) {
             ServerConnection connection = new ServerConnection(protocol,
-                    serializer, info.ip, info.port);
-            connections.put(info.position, connection);
+                    serializer, info.getNodeHost(), info.getNodePort());
+            connections.put(info.getPosition(), connection);
         }
 
         cachedMetadata = metadata;

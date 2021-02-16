@@ -1,6 +1,7 @@
 package shared;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -46,7 +47,8 @@ public class Metadata implements Serializable {
             if (ringPosition.compareTo(servers.get(mid).getPosition()) < 0) {
                 // ringPosition < mid
                 right = mid;
-            } else if (ringPosition.compareTo(servers.get(mid).getPosition()) == 0) {
+            } else if (ringPosition
+                    .compareTo(servers.get(mid).getPosition()) == 0) {
                 // ringPosition == mid
                 return servers.get(mid);
             } else {
