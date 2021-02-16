@@ -1,8 +1,11 @@
 package shared.messages;
 
+import shared.Metadata;
+
 public interface KVMessage {
 
     public enum StatusType {
+        CONNECTED,          /* Received when first connected */
         DISCONNECT,         /* Ask server to disconnect */
         GET,                /* Get - request */
         GET_ERROR,          /* requested tuple (i.e. value) not found */
@@ -20,16 +23,22 @@ public interface KVMessage {
     }
 
     /**
-     * @return the key that is associated with this message, null if not key is
+     * @return the key that is associated with this message, null if no key is
      * associated.
      */
     public String getKey();
 
     /**
-     * @return the value that is associated with this message, null if not value
+     * @return the value that is associated with this message, null if no value
      * is associated.
      */
     public String getValue();
+
+    /**
+     * @return the metadata associated with this message (e.g. for
+     * NOT_RESPONSIBLE status), null if no value is associated.
+     */
+    public Metadata getMetadata();
 
     /**
      * @return a status string that is used to identify request types, response

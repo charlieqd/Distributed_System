@@ -1,19 +1,16 @@
 package client;
 
 import org.apache.log4j.Logger;
-import shared.IProtocol;
-import shared.ISerializer;
-import shared.Response;
-import shared.Util;
+import shared.*;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
-import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -31,35 +28,36 @@ public class ServerConnection {
 
     private IProtocol protocol;
     private ISerializer<KVMessage> serializer;
-    private BlockingQueue<Response> watcherQueue;
+    private final BlockingQueue<Response> watcherQueue = new LinkedBlockingQueue<>();
     private String address;
     private int port;
-    private KVMessageSerializer serializer;
 
-    private int nextId = 0;
+    private boolean neverConnected = true;
 
     public ServerConnection(IProtocol protocol,
                             ISerializer<KVMessage> serializer,
-                            BlockingQueue<Response> watcherQueue,
                             String address,
-                            int port,
-                            KVMessageSerializer serializer;) {
+                            int port) {
         this.protocol = protocol;
         this.serializer = serializer;
-        this.watcherQueue = watcherQueue;
         this.address = address;
         this.port = port;
-        this.serializer = serializer;
     }
 
     public boolean isConnectionValid() {
         return running && !terminated.get();
     }
 
+    public boolean isNeverConnected() {
+        return neverConnected;
+    }
+
     public Metadata connect() throws Exception {
         if (running) {
             throw new IllegalStateException("Already connected");
         }
+
+        neverConnected = false;
 
         try {
             clientSocket = new Socket(address, port);
@@ -74,20 +72,28 @@ public class ServerConnection {
         }
 
         running = true;
-        Metadata metaData = null;
+        Metadata metadata = null;
         try {
             Response res = protocol.readResponse(input);
-            int status = res.getStatus();
-            if (status == Response.Status.CONNECTION_ESTABLISHED) {
-                byte[] msgByte = res.getBody();
-                KVMessage message = serializer.decode(msgByte);
-                metaData = message.getMetaData();
-                logger.info("Connection Established!");
-            } else {
+            try {
+                int status = res.getStatus();
+                if (status == Response.Status.CONNECTION_ESTABLISHED) {
+                    byte[] msgByte = res.getBody();
+                    if (msgByte == null) {
+                        throw new IllegalStateException(
+                                "Connection error: server did not acknowledge connection");
+                    }
+                    KVMessage message = serializer.decode(msgByte);
+                    metadata = message.getMetadata();
+                    logger.info("Connection Established!");
+                } else {
+                    throw new IllegalStateException(
+                            "Connection error: server did not acknowledge connection");
+                }
+            } catch (Exception e) {
                 logger.error("Connection Error!");
                 disconnect();
-                throw new IllegalStateException(
-                        "Connection error: server did not acknowledge connection");
+                throw e;
             }
         } catch (IOException ioe) {
             logger.error("Connection lost!");
@@ -100,7 +106,7 @@ public class ServerConnection {
         watcher = new Thread(
                 new SocketWatcher(protocol, watcherQueue, this));
         watcher.start();
-        return metaData;
+        return metadata;
     }
 
     public void disconnect() {
@@ -117,7 +123,7 @@ public class ServerConnection {
 
             if (clientSocket != null) {
                 // This must be after setting running = false to avoid infinite recursion
-                sendRequest(null, null, KVMessage.StatusType.DISCONNECT);
+                sendRequest(-1, null, null, KVMessage.StatusType.DISCONNECT);
 
                 clientSocket.close();
                 clientSocket = null;
@@ -179,8 +185,9 @@ public class ServerConnection {
 
     /**
      * Return the ID of the request sent. If request failed to send, return -1.
+     * Note that ID given must be non-negative.
      */
-    public int sendRequest(String key, String value,
+    public int sendRequest(int id, String key, String value,
                            KVMessage.StatusType status) throws IOException {
         try {
             KVMessage kvMsg = new KVMessageImpl(key, value, status);
@@ -193,9 +200,7 @@ public class ServerConnection {
                         .getStackTraceString(e));
                 return -1;
             }
-            int id = nextId;
-            protocol.writeRequest(output, nextId, msgBytes);
-            nextId += 1;
+            protocol.writeRequest(output, id, msgBytes);
             return id;
         } catch (IOException e) {
             logger.warn("Unable to send message! Disconnected!");
