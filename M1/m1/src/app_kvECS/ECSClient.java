@@ -10,6 +10,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ECSClient implements IECSClient {
 
@@ -28,6 +29,11 @@ public class ECSClient implements IECSClient {
     public ECSClient(InputStream inputStream, ArrayList<ECSNode> servers) {
         this.input = inputStream;
         this.servers = servers;
+        ArrayList<ECSNode> availableToAdd = new ArrayList<>();
+        for (ECSNode s : servers) {
+            availableToAdd.add(s);
+        }
+        this.availableToAdd = availableToAdd;
         this.controller = new ECSController();
     }
 
@@ -51,26 +57,37 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        // TODO
         if (availableToAdd.isEmpty()) {
             String msg = "No node is available to add.";
             logger.error(msg);
             printError(msg);
+            return null;
         }
+
         Process proc;
+        int randomNum = ThreadLocalRandom.current()
+                .nextInt(0, availableToAdd.size());
+        ECSNode node = availableToAdd.get(randomNum);
         String script = String
-                .format("invoke_server.sh %s %s", servers.get(0).getNodeHost(),
-                        servers.get(0).getNodePort());
+                .format("invoke_server.sh %s %s %s %d", node.getNodeHost(),
+                        node.getNodePort(), cacheStrategy, cacheSize);
 
         Runtime run = Runtime.getRuntime();
         try {
             proc = run.exec(script);
         } catch (IOException e) {
             e.printStackTrace();
-            logger.error("Failed to add nodes", e);
-            printError("Failed to add node");
+            String msg = String
+                    .format("Failed to add nodes, name: %s, host: %s, port: %s",
+                            node.getNodeName(), node.getNodeHost(),
+                            node.getNodePort());
+            logger.error(msg, e);
+            printError(msg);
+            return null;
         }
-        return null;
+
+        availableToAdd.remove(randomNum);
+        return servers.get(randomNum);
     }
 
     @Override
@@ -86,10 +103,12 @@ public class ECSClient implements IECSClient {
             return null;
         }
 
+        ArrayList<IECSNode> addedNodes = new ArrayList();
         for (int i = 0; i < count; i++) {
-            addNode(cacheStrategy, cacheSize);
+            addedNodes.add(addNode(cacheStrategy, cacheSize));
         }
-        return null;
+
+        return addedNodes;
     }
 
     @Override
