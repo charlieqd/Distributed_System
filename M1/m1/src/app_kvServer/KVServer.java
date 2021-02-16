@@ -71,8 +71,8 @@ public class KVServer extends Thread implements IKVServer {
                 try {
                     Socket client = serverSocket.accept();
                     ClientConnection connection =
-                            new ClientConnection(client, storage, protocol,
-                                    messageSerializer);
+                            new ClientConnection(this, client, storage,
+                                    protocol, messageSerializer);
                     new Thread(connection).start();
 
                     logger.info("Connected to "
@@ -87,7 +87,7 @@ public class KVServer extends Thread implements IKVServer {
         logger.info("Server stopped.");
     }
 
-    private boolean isRunning() {
+    public boolean isRunning() {
         return this.running;
     }
 

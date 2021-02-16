@@ -16,20 +16,29 @@ public class KVMessageImpl implements KVMessage, Serializable {
     private Metadata metadata;
     private StatusType status;
 
+    private Object ecsCommandArg = null;
+
     public KVMessageImpl(String key, String value, StatusType status) {
-        this.key = key;
-        this.value = value;
-        this.metadata = null;
-        this.status = status;
+        this(key, value, null, status);
     }
 
     public KVMessageImpl(String key,
                          String value,
                          Metadata metadata,
                          StatusType status) {
+        this(key, value, metadata, status, null);
+    }
+
+    public KVMessageImpl(String key,
+                         String value,
+                         Metadata metadata,
+                         StatusType status,
+                         Object ecsCommandArg) {
         this.key = key;
         this.value = value;
+        this.metadata = metadata;
         this.status = status;
+        this.ecsCommandArg = ecsCommandArg;
     }
 
     @Override
@@ -44,6 +53,11 @@ public class KVMessageImpl implements KVMessage, Serializable {
 
     public Metadata getMetadata() {
         return metadata;
+    }
+
+    @Override
+    public Object getECSCommandArg() {
+        return ecsCommandArg;
     }
 
     @Override
@@ -88,6 +102,20 @@ public class KVMessageImpl implements KVMessage, Serializable {
                 return statusName;
             case SERVER_STOPPED:
                 return statusName;
+            case ECS_START_SERVING:
+                return statusName;
+            case ECS_STOP_SERVING:
+                return statusName;
+            case ECS_SHUT_DOWN:
+                return statusName;
+            case ECS_LOCK_WRITE:
+                return statusName;
+            case ECS_UNLOCK_WRITE:
+                return statusName;
+            case ECS_MOVE_DATA:
+                return statusName + "<(ecsCommandArg)>";
+            case ECS_UPDATE_METADATA:
+                return statusName + "<(metadata)>";
             case FAILED:
                 return statusName + "<" + value + ">";
         }

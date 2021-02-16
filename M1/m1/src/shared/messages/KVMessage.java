@@ -48,6 +48,13 @@ public interface KVMessage {
     public Metadata getMetadata();
 
     /**
+     * @return the arguments for ECS commands (e.g. ECS_MOVE_DATA); null if this
+     * message is not an ECS message or if the ECS message has no argument (e.g.
+     * ECS_START_SERVING).
+     */
+    public Object getECSCommandArg();
+
+    /**
      * @return a status string that is used to identify request types, response
      * types and error types associated to the message.
      */
