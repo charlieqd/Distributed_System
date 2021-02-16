@@ -140,10 +140,10 @@ public class AdditionalTest {
 
     @Test
     public void testMetaData() {
-        ECSNode s1 = new ECSNode("ip", 0, "apple");
-        ECSNode s2 = new ECSNode("ip", 0, "beta");
-        ECSNode s3 = new ECSNode("ip", 0, "cat");
-        ECSNode s4 = new ECSNode("ip", 0, "dog");
+        ECSNode s1 = new ECSNode("s1", "ip", 0, "apple");
+        ECSNode s2 = new ECSNode("s2", "ip", 0, "beta");
+        ECSNode s3 = new ECSNode("s3", "ip", 0, "cat");
+        ECSNode s4 = new ECSNode("s4", "ip", 0, "dog");
         ArrayList<ECSNode> servers = new ArrayList<ECSNode>();
         servers.add(s1);
         servers.add(s2);

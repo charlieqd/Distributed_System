@@ -1,9 +1,12 @@
 package app_kvServer;
 
+import app_kvECS.ZooKeeperListener;
+import app_kvECS.ZooKeeperService;
 import logger.LogSetup;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.WatchedEvent;
 import server.*;
 import shared.IProtocol;
 import shared.ISerializer;
@@ -21,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class KVServer extends Thread implements IKVServer {
+public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
 
     private static Logger logger = Logger.getRootLogger();
     public final AtomicBoolean serving = new AtomicBoolean(false);
@@ -39,6 +42,10 @@ public class KVServer extends Thread implements IKVServer {
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
 
+    private final ZooKeeperService zooKeeperService;
+
+    private String name;
+
     /**
      * Start KV Server at given port
      *
@@ -50,11 +57,14 @@ public class KVServer extends Thread implements IKVServer {
     public KVServer(IKVStorage storage,
                     IProtocol protocol,
                     ISerializer<KVMessage> messageSerializer,
-                    int port) {
+                    int port, String name, ZooKeeperService zooKeeperService) {
+        this.name = name;
         this.storage = storage;
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
         this.port = port;
+        this.zooKeeperService = zooKeeperService;
+        zooKeeperService.addListener(this);
     }
 
     /**
@@ -68,6 +78,8 @@ public class KVServer extends Thread implements IKVServer {
         running = initializeServer();
 
         if (serverSocket != null) {
+            //String node = String.format();
+            zooKeeperService.createNode(name, false, new byte[0], true);
             while (isRunning()) {
                 try {
                     Socket client = serverSocket.accept();
@@ -146,6 +158,12 @@ public class KVServer extends Thread implements IKVServer {
             addOption(options, "l", "logLevel", true,
                     "log level of the server: ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF",
                     false);
+            addOption(options, "z", "zooKeeper", true,
+                    "the url of zooKeeper",
+                    true);
+            addOption(options, "n", "name", true,
+                    "name of the server",
+                    true);
 
             int port;
             int cacheSize;
@@ -153,6 +171,8 @@ public class KVServer extends Thread implements IKVServer {
             HelpFormatter formatter = new HelpFormatter();
             Level logLevel;
             String rootPath;
+            String url;
+            String name;
 
             try {
                 if (args.length == 1 &&
@@ -193,6 +213,9 @@ public class KVServer extends Thread implements IKVServer {
 
                 logLevel = Level
                         .toLevel(cmd.getOptionValue("l", DEFAULT_LOG_LEVEL));
+
+                url = cmd.getOptionValue("z");
+                name = cmd.getOptionValue("n");
             } catch (Exception e) {
                 e.printStackTrace();
                 formatter.printHelp("m1-server", options);
@@ -216,8 +239,10 @@ public class KVServer extends Thread implements IKVServer {
                     cacheSize, cacheStrategy);
             IProtocol protocol = new Protocol();
             ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
+            ZooKeeperService zooKeeperService = new ZooKeeperService(url);
 
-            new KVServer(storage, protocol, messageSerializer, port)
+            new KVServer(storage, protocol, messageSerializer, port,
+                    name, zooKeeperService)
                     .start();
 
         } catch (IOException e) {
@@ -303,5 +328,10 @@ public class KVServer extends Thread implements IKVServer {
      */
     public void updateMetadata(Metadata metadata) {
         throw new Error("Not implemented");
+    }
+
+    @Override
+    public void handleZooKeeperEvent(WatchedEvent event) {
+
     }
 }

@@ -19,6 +19,7 @@ public interface KVMessage {
         NOT_RESPONSIBLE,    /* server not responsible for the key */
         SERVER_WRITE_LOCK,  /* server has locked write operations */
         SERVER_STOPPED,     /* server is stopped */
+        ECS_SUCCESS,        /* ECS: signal to ECS that the last command was successful */
         ECS_START_SERVING,  /* ECS: order this server to allow all client requests */
         ECS_STOP_SERVING,   /* ECS: order this server to block all client requests */
         ECS_SHUT_DOWN,      /* ECS: order this server to shut down */

@@ -1,35 +1,32 @@
 package app_kvECS;
 
+import ecs.ECSController;
 import logger.LogSetup;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import shared.ECSNode;
 import shared.messages.IECSNode;
 
-import java.io.*;
-import java.util.ArrayList;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class ECSClient implements IECSClient {
 
-    private ArrayList<ECSNode> servers;
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECS Client> ";
     private final InputStream input;
     private BufferedReader stdin;
     private boolean stop = false;
 
-    ArrayList<ECSNode> availableToAdd;
+    private final ECSController controller;
 
-    public ECSClient(InputStream inputStream, ArrayList<ECSNode> servers) {
+    public ECSClient(InputStream inputStream, String configPath) throws
+            IOException {
         this.input = inputStream;
-        this.servers = servers;
-        ArrayList<ECSNode> availableToAdd = new ArrayList<>();
-        for (ECSNode s : servers) {
-            availableToAdd.add(s);
-        }
-        this.availableToAdd = availableToAdd;
+        this.controller = new ECSController(configPath);
     }
 
     @Override
@@ -52,58 +49,23 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        if (availableToAdd.isEmpty()) {
-            String msg = "No node is available to add.";
-            logger.error(msg);
-            printError(msg);
-            return null;
-        }
-
-        Process proc;
-        int randomNum = ThreadLocalRandom.current()
-                .nextInt(0, availableToAdd.size());
-        ECSNode node = availableToAdd.get(randomNum);
-        String script = String
-                .format("invoke_server.sh %s %s %s %d", node.getNodeHost(),
-                        node.getNodePort(), cacheStrategy, cacheSize);
-
-        Runtime run = Runtime.getRuntime();
         try {
-            proc = run.exec(script);
-        } catch (IOException e) {
-            e.printStackTrace();
-            String msg = String
-                    .format("Failed to add nodes, name: %s, host: %s, port: %s",
-                            node.getNodeName(), node.getNodeHost(),
-                            node.getNodePort());
-            logger.error(msg, e);
-            printError(msg);
+            return controller.addNode(cacheStrategy, cacheSize);
+        } catch (Exception e) {
+            printError("Unable to add node: " + e.getMessage());
             return null;
         }
-
-        availableToAdd.remove(randomNum);
-        return servers.get(randomNum);
     }
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy,
                                          int cacheSize) {
-        // TODO
-        if (availableToAdd.size() < count) {
-            String msg = String
-                    .format("No enough nodes to add. Number of available node: %s",
-                            availableToAdd.size());
-            logger.error(msg);
-            printError(msg);
+        try {
+            return controller.addNodes(count, cacheStrategy, cacheSize);
+        } catch (Exception e) {
+            printError("Unable to add nodes: " + e.getMessage());
             return null;
         }
-
-        ArrayList<IECSNode> addedNodes = new ArrayList();
-        for (int i = 0; i < count; i++) {
-            addedNodes.add(addNode(cacheStrategy, cacheSize));
-        }
-
-        return addedNodes;
     }
 
     @Override
@@ -137,29 +99,6 @@ public class ECSClient implements IECSClient {
         return null;
     }
 
-    public static ArrayList<ECSNode> readConfig(String fileName) throws
-            IOException {
-        ArrayList<ECSNode> servers = new ArrayList<>();
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new FileReader(fileName));
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] tokens = line.split(" ");
-                ECSNode server = new ECSNode(tokens[1],
-                        Integer.parseInt(tokens[2]), "");
-                servers.add(server);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (br != null) {
-                br.close();
-            }
-            return servers;
-        }
-    }
-
     public boolean connectionValid() {
         return !stop;
     }
@@ -167,24 +106,31 @@ public class ECSClient implements IECSClient {
     private void handleCommand(String cmdLine) throws Exception {
         String[] tokens = cmdLine.trim().split("\\s+");
 
-        if (tokens[0].equals("shut") && tokens[1].equals("down")) {
-            stop = true;
-            shutdown();
-            System.out.println("Application exit!");
+        if (tokens[0].equals("shutdown")) {
+            if (tokens.length == 1) {
+                stop = true;
+                shutdown();
+                System.out.println("Application exit!");
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
         } else if (tokens[0].equals("start")) {
             if (tokens.length == 1) {
                 start();
             } else {
                 printError("Invalid number of parameters!");
             }
-         }else if (tokens[0].equals("stop")) {
+
+        } else if (tokens[0].equals("stop")) {
             if (tokens.length == 1) {
                 stop();
             } else {
                 printError("Invalid number of parameters!");
             }
-        } else if (tokens[0].equals("addNodes")) {
-            if (tokens.length == 1) {
+
+        } else if (tokens[0].equals("addnodes")) {
+            if (tokens.length == 2) {
                 int nodesNum = Integer.parseInt(tokens[1]);
                 String cacheStrategy = tokens[2];
                 int cacheSize = Integer.parseInt(tokens[3]);
@@ -206,7 +152,7 @@ public class ECSClient implements IECSClient {
                 printError("Invalid number of parameters!");
             }
 
-        } else if (tokens[0].equals("addNode")) {
+        } else if (tokens[0].equals("addnode")) {
             if (tokens.length == 3) {
                 String cacheStrategy = tokens[1];
                 int cacheSize = Integer.parseInt(tokens[2]);
@@ -216,7 +162,7 @@ public class ECSClient implements IECSClient {
                 printError("Invalid number of parameters!");
             }
 
-        } else if (tokens[0].equals("removeNode")) {
+        } else if (tokens[0].equals("removenode")) {
             if (tokens.length == 2) {
                 //To do
             } else {
@@ -240,25 +186,22 @@ public class ECSClient implements IECSClient {
         sb.append("ECS CLIENT HELP (Usage):\n");
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
+        sb.append("addnode");
+        sb.append("\t add a single node to the system\n");
+        sb.append("addnodes <count>");
+        sb.append("\t add a given number of nodes to the system\n");
         sb.append("start");
-        sb.append("\t Starts the storage service\n");
-        sb.append("addNodes(int numberOfNodes)");
-        sb.append("\t\t Randomly choose <numberOfNodes> servers from the available machines and start the Servers. \n");
-        sb.append("add node <key> [<value>]");
-        sb.append(
-                "\t Create a new KVServer and add it to the storage service. \n");
-        sb.append("removeNode(<index of server>)");
-        sb.append("\t\t Remove a server from the storage service \n");
-        sb.append("shut down");
-        sb.append("\t\t Stops all server instances and exits the remote processes. \n");
-
+        sb.append("\t signal all servers to start serving\n");
+        sb.append("stop");
+        sb.append("\t signal all servers to stop serving\n");
+        sb.append("removenode <index>");
+        sb.append("\t remove a server from the system\n");
+        sb.append("shutdown");
+        sb.append("\t stop all server instances and exit\n");
         sb.append("logLevel");
-        sb.append("\t\t changes the logLevel \n");
+        sb.append("\t changes the logLevel \n");
         sb.append("\t\t\t ");
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
-
-        sb.append("stop");
-        sb.append("\t\t\t Stops the service");
         System.out.println(sb.toString());
     }
 
@@ -285,19 +228,20 @@ public class ECSClient implements IECSClient {
     }
 
     public static void main(String[] args) throws Exception {
-        try{
-            new LogSetup("logs/client.log", Level.OFF);
-            String fileName = args[0];
-            ArrayList<ECSNode> servers = readConfig(fileName);
-            ECSClient ecsApp = new ECSClient(System.in, servers);
-            ecsApp.run();
+        if (args.length != 1) {
+            System.out.println("usage: <config-file-path>");
+            System.exit(1);
+        }
+
+        try {
+            new LogSetup("logs/ecsclient.log", Level.OFF);
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");
             e.printStackTrace();
             System.exit(1);
         }
-
-
-
+        String configPath = args[0];
+        ECSClient ecsApp = new ECSClient(System.in, configPath);
+        ecsApp.run();
     }
 }

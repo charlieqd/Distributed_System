@@ -13,10 +13,15 @@ public class ECSNode implements Comparable, IECSNode, Serializable {
     private String name;
     private String position;
 
-    public ECSNode(String host, int port, String position) {
+    public ECSNode(String name, String host, int port, String position) {
+        this.name = name;
         this.host = host;
         this.port = port;
         this.position = position;
+    }
+
+    public ECSNode(String name, String host, int port) {
+        this(name, host, port, getRingPosition(host, port));
     }
 
     @Override
@@ -41,6 +46,20 @@ public class ECSNode implements Comparable, IECSNode, Serializable {
 
     public String getPosition() {
         return position;
+    }
+
+    @Override
+    public String toString() {
+        return "ECSNode{" +
+                "host='" + host + '\'' +
+                ", port=" + port +
+                ", name='" + name + '\'' +
+                ", position='" + position + '\'' +
+                '}';
+    }
+
+    public static String getRingPosition(String host, int port) {
+        return Metadata.getRingPosition(String.format("%s:%d", host, port));
     }
 
 }
