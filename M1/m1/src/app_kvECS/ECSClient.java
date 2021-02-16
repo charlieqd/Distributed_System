@@ -237,14 +237,13 @@ public class ECSClient implements IECSClient {
         stdin = new BufferedReader(new InputStreamReader(this.input));
         while (!stop) {
             System.out.print(PROMPT);
-
             try {
                 String cmdLine = stdin.readLine();
                 this.handleCommand(cmdLine);
             } catch (IOException e) {
                 stop = true;
                 logger.error("Failed to read from command line", e);
-                printError("CLI does not respond - Application terminated ");
+                printError("ECS Client does not respond - Application terminated ");
             }
 
             System.out.println("");
