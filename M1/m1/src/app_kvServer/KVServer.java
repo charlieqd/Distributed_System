@@ -292,7 +292,6 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * Exits the KVServer application.
      */
     public void shutDown() {
-        // close the big socket
         stopServer();
     }
 
@@ -300,7 +299,6 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * Lock the KVServer for write operations.
      */
     public void lockWrite() {
-        // create a lock and add check in kvstorage
         writing.set(true);
     }
 

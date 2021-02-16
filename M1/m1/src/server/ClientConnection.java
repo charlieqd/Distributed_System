@@ -123,6 +123,12 @@ public class ClientConnection implements Runnable {
         return responseMessage;
     }
 
+    private KVMessage handleWritingBlock(){
+        KVMessage responseMessage = new KVMessageImpl(null, "Write Locked",
+                KVMessage.StatusType.SERVER_WRITE_LOCK);
+        return responseMessage;
+    }
+
     private void handleMessage(OutputStream output,
                                Request request,
                                KVMessage requestMessage) throws IOException {
@@ -180,6 +186,8 @@ public class ClientConnection implements Runnable {
             case PUT: {
                 if(!server.serving.get()){
                     responseMessage = handleNotServing();
+                }else if(server.writing.get()){
+                    responseMessage = handleWritingBlock();
                 }else {
                     String key = requestMessage.getKey();
                     String value = requestMessage.getValue();
@@ -231,19 +239,43 @@ public class ClientConnection implements Runnable {
             }
 
             case ECS_SHUT_DOWN: {
-
+                try {
+                    server.shutDown();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_LOCK_WRITE: {
-
+                try {
+                    server.lockWrite();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_UNLOCK_WRITE: {
-
+                try {
+                    server.unlockWrite();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_MOVE_DATA: {
-
+                break;
             }
 
             case ECS_UPDATE_METADATA: {
