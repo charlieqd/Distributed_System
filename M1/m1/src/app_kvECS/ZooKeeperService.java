@@ -10,9 +10,7 @@ import java.util.List;
 
 public class ZooKeeperService {
 
-    private String host;
-
-    private int port;
+    private String url;
 
     private static Logger logger = Logger.getRootLogger();
 
@@ -22,7 +20,7 @@ public class ZooKeeperService {
 
     private List<ZooKeeperListener> listeners = new ArrayList<>();
 
-    public class ProcessNodeWatcher implements Watcher {
+    private class ProcessNodeWatcher implements Watcher {
 
         @Override
         public void process(WatchedEvent event) {
@@ -33,14 +31,11 @@ public class ZooKeeperService {
     }
 
 
-    public ZooKeeperService(String host, int port,
-                            final ProcessNodeWatcher processNodeWatcher) throws
+    public ZooKeeperService(String url) throws
             IOException {
-        this.host = host;
-        this.port = port;
-        String connectString = String.format("%s:%d", host, port);
-        zooKeeper = new ZooKeeper(connectString,
-                DEFAULT_TIMEOUT, processNodeWatcher);
+        this.url = url;
+        zooKeeper = new ZooKeeper(url,
+                DEFAULT_TIMEOUT, new ProcessNodeWatcher());
     }
 
 
