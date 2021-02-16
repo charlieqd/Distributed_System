@@ -79,7 +79,7 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
         running = initializeServer();
 
         if (serverSocket != null) {
-            String node = String.format();
+            //String node = String.format();
             zooKeeperService.createNode(name, false, new byte[0], true);
             while (isRunning()) {
                 try {
