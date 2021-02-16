@@ -7,6 +7,7 @@ import org.apache.log4j.Logger;
 import server.*;
 import shared.IProtocol;
 import shared.ISerializer;
+import shared.Metadata;
 import shared.Protocol;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageSerializer;
@@ -67,8 +68,8 @@ public class KVServer extends Thread implements IKVServer {
                 try {
                     Socket client = serverSocket.accept();
                     ClientConnection connection =
-                            new ClientConnection(client, storage, protocol,
-                                    messageSerializer);
+                            new ClientConnection(this, client, storage,
+                                    protocol, messageSerializer);
                     new Thread(connection).start();
 
                     logger.info("Connected to "
@@ -83,7 +84,7 @@ public class KVServer extends Thread implements IKVServer {
         logger.info("Server stopped.");
     }
 
-    private boolean isRunning() {
+    public boolean isRunning() {
         return this.running;
     }
 
@@ -91,7 +92,7 @@ public class KVServer extends Thread implements IKVServer {
      * Stops the server insofar that it won't listen at the given port any
      * more.
      */
-    public void stopServer() {
+    private void stopServer() {
         running = false;
         try {
             serverSocket.close();
@@ -238,5 +239,61 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public int getPort() {
         return this.port;
+    }
+
+    /**
+     * Starts the KVServer, all client requests and all ECS requests are
+     * processed.
+     */
+    public void startServing() {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stops the KVServer, all client requests are rejected and only ECS
+     * requests are processed.
+     */
+    public void stopServing() {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Exits the KVServer application.
+     */
+    public void shutDown() {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Lock the KVServer for write operations.
+     */
+    public void lockWrite() {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Unlock the KVServer for write operations.
+     */
+    public void unlockWrite() {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Transfer a subset (range) of the KVServer’s data to another KVServer
+     * (reallocation before removing this server or adding a new KVServer to the
+     * ring); send a notification to the ECS, if data transfer is completed.
+     */
+    public void moveData(String hashRangeStart,
+                         String hashRangeEnd,
+                         String host,
+                         int port) {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Update the metadata repository of this server
+     */
+    public void updateMetadata(Metadata metadata) {
+        throw new Error("Not implemented");
     }
 }

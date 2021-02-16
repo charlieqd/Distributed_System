@@ -1,5 +1,6 @@
 package server;
 
+import app_kvServer.KVServer;
 import org.apache.log4j.Logger;
 import shared.*;
 import shared.messages.KVMessage;
@@ -20,8 +21,6 @@ public class ClientConnection implements Runnable {
     private static final Logger logger = Logger.getRootLogger();
 
     private boolean isOpen;
-    private static final int BUFFER_SIZE = 1024;
-    private static final int DROP_SIZE = 128 * BUFFER_SIZE;
 
     private final Socket clientSocket;
     private InputStream input;
@@ -30,15 +29,19 @@ public class ClientConnection implements Runnable {
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
 
+    private KVServer server;
+
     /**
      * Constructs a new CientConnection object for a given TCP socket.
      *
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection(Socket clientSocket,
+    public ClientConnection(KVServer server,
+                            Socket clientSocket,
                             IKVStorage storage,
                             IProtocol protocol,
                             ISerializer<KVMessage> messageSerializer) {
+        this.server = server;
         this.clientSocket = clientSocket;
         this.isOpen = true;
         this.storage = storage;
@@ -58,7 +61,7 @@ public class ClientConnection implements Runnable {
             sendResponse(output, null, Response.Status.CONNECTION_ESTABLISHED,
                     null);
 
-            while (isOpen) {
+            while (isOpen && server.isRunning()) {
                 try {
                     Request request = receiveRequest(input);
                     if (request == null) {
