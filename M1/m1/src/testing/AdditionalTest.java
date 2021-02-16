@@ -6,6 +6,8 @@ import org.junit.rules.TemporaryFolder;
 import server.FIFOCache;
 import server.KVFileStorage;
 import server.LRUCache;
+import shared.Metadata;
+import shared.ServerInfo;
 import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
@@ -13,6 +15,7 @@ import shared.messages.KVMessageSerializer;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -133,5 +136,38 @@ public class AdditionalTest {
         assertNull(storage.read("ag\\e"));
         storage.write(",,,,", "//\\/\\/\\/\\/");
         assertEquals(storage.read(",,,,"), "//\\/\\/\\/\\/");
+    }
+
+    @Test
+    public void testMetaData() {
+        ServerInfo s1 = new ServerInfo("ip", 0, "apple");
+        ServerInfo s2 = new ServerInfo("ip", 0, "beta");
+        ServerInfo s3 = new ServerInfo("ip", 0, "cat");
+        ServerInfo s4 = new ServerInfo("ip", 0, "dog");
+        ArrayList<ServerInfo> servers = new ArrayList<ServerInfo>();
+        servers.add(s1);
+        servers.add(s2);
+        servers.add(s3);
+        servers.add(s4);
+        Metadata metadata = new Metadata(servers);
+        assertEquals(s1, metadata.getServer("eye"));
+        assertEquals(s1, metadata.getServer("aa"));
+        assertEquals(s2, metadata.getServer("bad"));
+        assertEquals(s3, metadata.getServer("bob"));
+        assertEquals(s4, metadata.getServer("cici"));
+        assertEquals(s1, metadata.getServer("apple"));
+        assertEquals(s2, metadata.getServer("beta"));
+        assertEquals(s3, metadata.getServer("cat"));
+        assertEquals(s4, metadata.getServer("dog"));
+
+        servers.clear();
+        assertNull(metadata.getServer("eye"));
+
+        servers.add(s1);
+        assertEquals(s1, metadata.getServer("eye"));
+        assertEquals(s1, metadata.getServer("aa"));
+        assertEquals(s1, metadata.getServer("bad"));
+
+
     }
 }
