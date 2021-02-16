@@ -17,11 +17,14 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer {
 
     private static Logger logger = Logger.getRootLogger();
-
+    public final AtomicBoolean servering = new AtomicBoolean(false);
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
@@ -34,6 +37,7 @@ public class KVServer extends Thread implements IKVServer {
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
+    private final Lock writeLock;
 
     /**
      * Start KV Server at given port
@@ -51,6 +55,7 @@ public class KVServer extends Thread implements IKVServer {
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
         this.port = port;
+        this.writeLock = new ReentrantLock();
     }
 
     /**
@@ -246,7 +251,9 @@ public class KVServer extends Thread implements IKVServer {
      * processed.
      */
     public void startServing() {
-        throw new Error("Not implemented");
+        //After the server has been initialized,
+        //the ECS can start the server (call start()).
+        servering.set(true);
     }
 
     /**
@@ -254,28 +261,30 @@ public class KVServer extends Thread implements IKVServer {
      * requests are processed.
      */
     public void stopServing() {
-        throw new Error("Not implemented");
+        servering.set(false);
     }
 
     /**
      * Exits the KVServer application.
      */
     public void shutDown() {
-        throw new Error("Not implemented");
+        // close the big socket
+        stopServer();
     }
 
     /**
      * Lock the KVServer for write operations.
      */
     public void lockWrite() {
-        throw new Error("Not implemented");
+        // create a lock and add check in kvstorage
+        writeLock.lock();
     }
 
     /**
      * Unlock the KVServer for write operations.
      */
     public void unlockWrite() {
-        throw new Error("Not implemented");
+        writeLock.unlock();
     }
 
     /**

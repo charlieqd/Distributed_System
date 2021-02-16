@@ -2,6 +2,7 @@ package app_kvECS;
 
 import ecs.ECSController;
 import logger.LogSetup;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import shared.messages.IECSNode;
 
@@ -116,14 +117,14 @@ public class ECSClient implements IECSClient {
 
         } else if (tokens[0].equals("start")) {
             if (tokens.length == 1) {
-
+                start();
             } else {
                 printError("Invalid number of parameters!");
             }
 
         } else if (tokens[0].equals("stop")) {
             if (tokens.length == 1) {
-
+                stop();
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -131,7 +132,9 @@ public class ECSClient implements IECSClient {
         } else if (tokens[0].equals("addnodes")) {
             if (tokens.length == 2) {
                 int nodesNum = Integer.parseInt(tokens[1]);
-
+                String cacheStrategy = tokens[2];
+                int cacheSize = Integer.parseInt(tokens[3]);
+                addNodes(nodesNum, cacheStrategy, cacheSize);
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -150,7 +153,10 @@ public class ECSClient implements IECSClient {
             }
 
         } else if (tokens[0].equals("addnode")) {
-            if (tokens.length == 1) {
+            if (tokens.length == 3) {
+                String cacheStrategy = tokens[1];
+                int cacheSize = Integer.parseInt(tokens[2]);
+                addNode(cacheStrategy, cacheSize);
                 System.out.println("Add node");
             } else {
                 printError("Invalid number of parameters!");
@@ -158,15 +164,10 @@ public class ECSClient implements IECSClient {
 
         } else if (tokens[0].equals("removenode")) {
             if (tokens.length == 2) {
-                if (connectionValid()) {
-                    String key = tokens[1];
-                } else {
-                    printError("Not connected or connection stopped!");
-                }
+                //To do
             } else {
                 printError("Invalid number of parameters!");
             }
-
         } else if (tokens[0].equals("help")) {
             printHelp();
         } else {
@@ -227,16 +228,20 @@ public class ECSClient implements IECSClient {
     }
 
     public static void main(String[] args) throws Exception {
-        // TODO
-        // read config into a list of serverInfo
         if (args.length != 1) {
             System.out.println("usage: <config-file-path>");
+            System.exit(1);
+        }
+
+        try {
+            new LogSetup("logs/ecsclient.log", Level.OFF);
+        } catch (IOException e) {
+            System.out.println("Error! Unable to initialize logger!");
+            e.printStackTrace();
             System.exit(1);
         }
         String configPath = args[0];
         ECSClient ecsApp = new ECSClient(System.in, configPath);
         ecsApp.run();
-
-
     }
 }
