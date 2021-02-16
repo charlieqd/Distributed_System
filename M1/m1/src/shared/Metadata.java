@@ -1,7 +1,6 @@
 package shared;
 
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -22,32 +21,32 @@ public class Metadata implements Serializable {
     }
 
     // sorted
-    private ArrayList<ServerInfo> servers;
+    private ArrayList<ECSNode> servers;
 
-    public Metadata(ArrayList<ServerInfo> servers) {
+    public Metadata(ArrayList<ECSNode> servers) {
         this.servers = servers;
     }
 
-    public List<ServerInfo> getServers() {
+    public List<ECSNode> getServers() {
         return servers;
     }
 
-    public ServerInfo getServer(String ringPosition) {
+    public ECSNode getServer(String ringPosition) {
         if (servers.size() == 0) {
             return null;
         }
         return binarySearch(ringPosition);
     }
 
-    public ServerInfo binarySearch(String ringPosition) {
+    public ECSNode binarySearch(String ringPosition) {
         int left = 0;
         int right = servers.size() - 1;
         while (left < right) {
             int mid = (left + right) / 2;
-            if (ringPosition.compareTo(servers.get(mid).position) < 0) {
+            if (ringPosition.compareTo(servers.get(mid).getPosition()) < 0) {
                 // ringPosition < mid
                 right = mid;
-            } else if (ringPosition.compareTo(servers.get(mid).position) == 0) {
+            } else if (ringPosition.compareTo(servers.get(mid).getPosition()) == 0) {
                 // ringPosition == mid
                 return servers.get(mid);
             } else {
@@ -61,7 +60,7 @@ public class Metadata implements Serializable {
         }
 
         if (left == servers.size() - 1 && ringPosition
-                .compareTo(servers.get(left).position) > 0) {
+                .compareTo(servers.get(left).getPosition()) > 0) {
             return servers.get(0);
         }
 
