@@ -2,7 +2,12 @@ package shared;
 
 import shared.messages.IECSNode;
 
-public class ECSNode implements Comparable, IECSNode {
+import java.io.Serializable;
+
+public class ECSNode implements Comparable, IECSNode, Serializable {
+
+    private static final long serialVersionUID = 2917446459158862564L;
+
     private String host;
     private int port;
     private String name;
