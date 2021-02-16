@@ -6,8 +6,8 @@ import org.junit.rules.TemporaryFolder;
 import server.FIFOCache;
 import server.KVFileStorage;
 import server.LRUCache;
+import shared.ECSNode;
 import shared.Metadata;
-import shared.ServerInfo;
 import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
@@ -140,11 +140,11 @@ public class AdditionalTest {
 
     @Test
     public void testMetaData() {
-        ServerInfo s1 = new ServerInfo("ip", 0, "apple");
-        ServerInfo s2 = new ServerInfo("ip", 0, "beta");
-        ServerInfo s3 = new ServerInfo("ip", 0, "cat");
-        ServerInfo s4 = new ServerInfo("ip", 0, "dog");
-        ArrayList<ServerInfo> servers = new ArrayList<ServerInfo>();
+        ECSNode s1 = new ECSNode("ip", 0, "apple");
+        ECSNode s2 = new ECSNode("ip", 0, "beta");
+        ECSNode s3 = new ECSNode("ip", 0, "cat");
+        ECSNode s4 = new ECSNode("ip", 0, "dog");
+        ArrayList<ECSNode> servers = new ArrayList<ECSNode>();
         servers.add(s1);
         servers.add(s2);
         servers.add(s3);

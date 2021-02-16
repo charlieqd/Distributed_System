@@ -1,4 +1,4 @@
-package ecs;
+package shared.messages;
 
 public interface IECSNode {
 

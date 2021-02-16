@@ -1,10 +1,10 @@
 package app_kvECS;
 
-import ecs.IECSNode;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import shared.ServerInfo;
+import shared.ECSNode;
+import shared.messages.IECSNode;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -13,15 +13,15 @@ import java.util.Map;
 
 public class ECSClient implements IECSClient {
 
-    private ArrayList<ServerInfo> servers;
-    private ArrayList<ServerInfo> serversAdded;
+    private ArrayList<ECSNode> servers;
+    private ArrayList<ECSNode> serversAdded;
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECSClient> ";
     private final InputStream input;
     private BufferedReader stdin;
     private boolean stop = false;
 
-    ArrayList<ServerInfo> availableToAdd;
+    ArrayList<ECSNode> availableToAdd;
 
     public ECSClient(InputStream inputStream) {
         this.input = inputStream;
@@ -55,8 +55,8 @@ public class ECSClient implements IECSClient {
         }
         Process proc;
         String script = String
-                .format("invoke_server.sh %s %s", servers.get(0).ip,
-                        servers.get(0).port);
+                .format("invoke_server.sh %s %s", servers.get(0).getNodeHost(),
+                        servers.get(0).getNodePort());
 
         Runtime run = Runtime.getRuntime();
         try {
@@ -127,7 +127,7 @@ public class ECSClient implements IECSClient {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] tokens = line.split(" ");
-                ServerInfo server = new ServerInfo(tokens[1],
+                ECSNode server = new ECSNode(tokens[1],
                         Integer.parseInt(tokens[2]), "");
                 servers.add(server);
             }
