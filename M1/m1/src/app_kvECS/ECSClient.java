@@ -23,10 +23,12 @@ public class ECSClient implements IECSClient {
 
     private final ECSController controller;
 
+    private final String DEFAULT_ZOOKEEPER_URL = "127.0.0.1:2181";
+
     public ECSClient(InputStream inputStream, String configPath) throws
             IOException {
         this.input = inputStream;
-        this.controller = new ECSController(configPath);
+        this.controller = new ECSController(configPath, DEFAULT_ZOOKEEPER_URL);
     }
 
     @Override

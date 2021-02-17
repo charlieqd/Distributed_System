@@ -6,6 +6,7 @@ import shared.messages.KVMessage;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.List;
 
 public class KVFileStorage implements IKVFileStorage {
@@ -37,6 +38,41 @@ public class KVFileStorage implements IKVFileStorage {
             }
 
             return null;
+        }
+    }
+
+    public ArrayList<String> readKeys(String hashRangeStart,
+                                      String hashRangeEnd) throws IOException {
+        if (!new File(filename).exists()) return null;
+
+        try (RandomAccessFile reader = new RandomAccessFile(filename,
+                "r")) {
+            ArrayList<String> keys = new ArrayList<>();
+            String line = reader.readLine();
+            while (line != null) {
+                List<String> data = Util.csvSplitLine(line);
+
+                if (data.size() < 2) {
+                    line = reader.readLine();
+                    continue;
+                }
+                if (hashRangeStart.compareTo(hashRangeEnd) > 0) {
+                    if (data.get(0).compareTo(hashRangeStart) > 0 || data.get(0)
+                            .compareTo(hashRangeEnd) <= 0) {
+                        keys.add(data.get(0));
+                    }
+                } else {
+                    if (data.get(0).compareTo(hashRangeStart) > 0 && data.get(0)
+                            .compareTo(hashRangeEnd) <= 0) {
+
+                        keys.add(data.get(0));
+                    }
+                }
+                line = reader.readLine();
+            }
+
+            reader.close();
+            return keys;
         }
     }
 
