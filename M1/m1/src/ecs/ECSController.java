@@ -26,21 +26,24 @@ public class ECSController {
     //   status is LAUNCHED.
     // - Exactly one sendRequest will be called before each receiveMessage.
 
-    public static final String zooKeeperRoot = "kvECS";
+    public static final String ZOO_KEEPER_ROOT = "kvECS";
 
     private static Logger logger = Logger.getRootLogger();
 
     private ArrayList<ECSNode> servers;
     private Map<ECSNode, ECSNodeState> nodeStates;
 
+    private String zooKeeperUrl;
+
     public ECSController(IProtocol protocol,
                          ISerializer<KVMessage> serializer,
-                         String configPath) {
+                         String configPath, String zooKeeperUrl) {
         servers = readConfig(configPath);
         nodeStates = new HashMap<>();
         for (ECSNode node : servers) {
             nodeStates.put(node, new ECSNodeState(protocol, serializer, node));
         }
+        this.zooKeeperUrl = zooKeeperUrl;
     }
 
     public IECSNode addNode(String cacheStrategy, int cacheSize) throws
@@ -58,8 +61,10 @@ public class ECSController {
                 .nextInt(0, availableToAdd.size());
         ECSNode node = availableToAdd.get(randomNum);
         String script = String
-                .format("invoke_server.sh %s %s %s %d", node.getNodeHost(),
-                        node.getNodePort(), cacheStrategy, cacheSize);
+                .format("invoke_server.sh %s %s %s %d %s %s",
+                        node.getNodeHost(),
+                        node.getNodePort(), cacheStrategy, cacheSize,
+                        zooKeeperUrl, node.getNodeName());
 
         Runtime run = Runtime.getRuntime();
         try {

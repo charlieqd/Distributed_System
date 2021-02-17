@@ -113,4 +113,14 @@ public class Util {
         e.printStackTrace(p);
         return s.toString();
     }
+
+    /**
+     * Add b to a.
+     */
+    public static <T> void concatenateArrayLists(ArrayList<T> a,
+                                                 ArrayList<T> b) {
+        for (T i : b) {
+            a.add(i);
+        }
+    }
 }

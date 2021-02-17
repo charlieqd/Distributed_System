@@ -28,12 +28,14 @@ public class ECSClient implements IECSClient {
 
     private final ECSController controller;
 
+    private final String DEFAULT_ZOOKEEPER_URL = "127.0.0.1:2181";
+
     public ECSClient(IProtocol protocol,
                      ISerializer<KVMessage> serializer,
                      InputStream inputStream, String configPath) throws
             IOException {
         this.input = inputStream;
-        this.controller = new ECSController(protocol, serializer, configPath);
+        this.controller = new ECSController(protocol, serializer, configPath, DEFAULT_ZOOKEEPER_URL);
     }
 
     @Override

@@ -2,6 +2,7 @@ package app_kvServer;
 
 import app_kvECS.ZooKeeperListener;
 import app_kvECS.ZooKeeperService;
+import ecs.ECSController;
 import client.ServerConnection;
 import logger.LogSetup;
 import org.apache.commons.cli.*;
@@ -84,8 +85,9 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
         running = initializeServer();
 
         if (serverSocket != null) {
-            //String node = String.format();
-            zooKeeperService.createNode(name, false, new byte[0], true);
+            String node = String
+                    .format("/%s/%s", ECSController.ZOO_KEEPER_ROOT, name);
+            zooKeeperService.createNode(node, false, new byte[0], true);
             while (isRunning()) {
                 try {
                     Socket client = serverSocket.accept();

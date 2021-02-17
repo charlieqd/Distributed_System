@@ -2,14 +2,19 @@ package server;
 
 import app_kvServer.IKVServer;
 import org.apache.log4j.Logger;
+import shared.Util;
 import shared.messages.KVMessage;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Stream;
 
 public class KVStorage implements IKVStorage {
 
@@ -120,4 +125,51 @@ public class KVStorage implements IKVStorage {
         return files.computeIfAbsent(hash, k -> new KVFileStorage(
                 Paths.get(rootPath, hash).toString()));
     }
+
+    public ArrayList<String> getAllKeys(String hashRangeStart,
+                                        String hashRangeEnd) throws
+            IOException {
+        lock.lock();
+        try (Stream<Path> paths = Files.walk(Paths.get(this.rootPath))) {
+
+            Object[] files = paths.filter(Files::isRegularFile)
+                    .filter(path -> {
+                        String fName = path.getFileName().toString();
+                        int prefixLength = fName.length();
+                        String startPrefix = hashRangeStart
+                                .substring(0, prefixLength);
+                        String endPrefix = hashRangeEnd
+                                .substring(0, prefixLength);
+
+                        if (hashRangeStart.compareTo(hashRangeEnd) > 0) {
+                            if (fName.compareTo(startPrefix) >= 0 || fName
+                                    .compareTo(endPrefix) <= 0) {
+                                return true;
+                            }
+                        } else {
+                            if (fName.compareTo(startPrefix) >= 0 && fName
+                                    .compareTo(endPrefix) <= 0) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }).toArray();
+
+            ArrayList<String> keys = new ArrayList<>();
+
+            for (Object f : files) {
+                KVFileStorage storage = new KVFileStorage(
+                        ((Path) f).toString());
+                Util.concatenateArrayLists(keys,
+                        storage.readKeys(hashRangeStart, hashRangeEnd));
+
+            });
+
+            return keys;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+
 }
