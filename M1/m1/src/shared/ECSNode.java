@@ -4,7 +4,7 @@ import shared.messages.IECSNode;
 
 import java.io.Serializable;
 
-public class ECSNode implements Comparable, IECSNode, Serializable {
+public class ECSNode implements Comparable<ECSNode>, IECSNode, Serializable {
 
     private static final long serialVersionUID = 2917446459158862564L;
 
@@ -25,7 +25,7 @@ public class ECSNode implements Comparable, IECSNode, Serializable {
     }
 
     @Override
-    public int compareTo(Object o) {
+    public int compareTo(ECSNode o) {
         return this.position.compareTo(((ECSNode) o).position);
     }
 

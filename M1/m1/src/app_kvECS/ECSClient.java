@@ -4,7 +4,12 @@ import ecs.ECSController;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import shared.IProtocol;
+import shared.ISerializer;
+import shared.Protocol;
 import shared.messages.IECSNode;
+import shared.messages.KVMessage;
+import shared.messages.KVMessageSerializer;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -23,10 +28,12 @@ public class ECSClient implements IECSClient {
 
     private final ECSController controller;
 
-    public ECSClient(InputStream inputStream, String configPath) throws
+    public ECSClient(IProtocol protocol,
+                     ISerializer<KVMessage> serializer,
+                     InputStream inputStream, String configPath) throws
             IOException {
         this.input = inputStream;
-        this.controller = new ECSController(configPath);
+        this.controller = new ECSController(protocol, serializer, configPath);
     }
 
     @Override
@@ -234,14 +241,19 @@ public class ECSClient implements IECSClient {
         }
 
         try {
-            new LogSetup("logs/ecsclient.log", Level.OFF);
+            new LogSetup("logs/ecsclient.log", Level.ERROR);
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");
             e.printStackTrace();
             System.exit(1);
         }
         String configPath = args[0];
-        ECSClient ecsApp = new ECSClient(System.in, configPath);
+
+        IProtocol protocol = new Protocol();
+        ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
+
+        ECSClient ecsApp = new ECSClient(protocol, messageSerializer, System.in,
+                configPath);
         ecsApp.run();
     }
 }

@@ -14,6 +14,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * NOTE: Currently this class only supports one pending message at a time. This
+ * means if sendRequest is called, receiveMessage must be called before the next
+ * sendRequest can be called.
+ */
 public class ServerConnection {
     private Logger logger = Logger.getRootLogger();
 
@@ -118,9 +123,9 @@ public class ServerConnection {
 
         logger.info("trying to close connection ...");
 
-        try {
-            running = false;
+        running = false;
 
+        try {
             logger.info("tearing down the connection ...");
 
             if (clientSocket != null) {
@@ -128,19 +133,22 @@ public class ServerConnection {
                 sendRequest(null, null, KVMessage.StatusType.DISCONNECT);
 
                 clientSocket.close();
-                clientSocket = null;
+            }
+        } catch (IOException ioe) {
+            logger.error("Unable to close socket!", ioe);
+        } finally {
+            clientSocket = null;
+            if (watcher != null) {
                 try {
                     watcher.join();
                 } catch (InterruptedException e) {
                     logger.error(Util.getStackTraceString(e));
                 }
-                terminated.set(false);
-                watcher = null;
-                watcherQueue.clear();
-                logger.info("connection closed!");
             }
-        } catch (IOException ioe) {
-            logger.error("Unable to close connection!");
+            terminated.set(false);
+            watcher = null;
+            watcherQueue.clear();
+            logger.info("connection closed.");
         }
     }
 
@@ -186,17 +194,23 @@ public class ServerConnection {
     }
 
     /**
-     * Return the ID of the request sent. If request failed to send, return -1.
-     * Note that ID given must be non-negative.
+     * See {@link #sendRequest(KVMessage message)}.
      */
     public int sendRequest(String key, String value,
                            KVMessage.StatusType status) throws IOException {
+        return sendRequest(new KVMessageImpl(key, value, status));
+    }
+
+    /**
+     * Return the ID of the request sent. If request failed to send, return -1.
+     * Note that ID given must be non-negative.
+     */
+    public int sendRequest(KVMessage message) throws IOException {
         try {
-            KVMessage kvMsg = new KVMessageImpl(key, value, status);
-            logger.info("Sending message: " + kvMsg.toString());
+            logger.debug("Sending message: " + message.toString());
             byte[] msgBytes;
             try {
-                msgBytes = serializer.encode(kvMsg);
+                msgBytes = serializer.encode(message);
             } catch (Exception e) {
                 logger.error("Failed to serialize message: " + Util
                         .getStackTraceString(e));

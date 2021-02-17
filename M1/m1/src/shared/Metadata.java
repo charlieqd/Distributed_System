@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class Metadata implements Serializable {
@@ -25,7 +26,8 @@ public class Metadata implements Serializable {
     private ArrayList<ECSNode> servers;
 
     public Metadata(ArrayList<ECSNode> servers) {
-        this.servers = servers;
+        this.servers = new ArrayList<>(servers);
+        Collections.sort(this.servers);
     }
 
     public List<ECSNode> getServers() {
