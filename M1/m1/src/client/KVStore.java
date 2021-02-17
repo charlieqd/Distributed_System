@@ -25,7 +25,6 @@ public class KVStore implements KVCommInterface {
 
     private String initialAddress;
     private int initialPort;
-    private int nextId;
 
     private KVMessageSerializer serializer;
     private Protocol protocol;
@@ -35,8 +34,6 @@ public class KVStore implements KVCommInterface {
      */
     private Map<String, ServerConnection> connections = new HashMap<>();
     private Metadata cachedMetadata = null;
-
-    private int nextID = 0;
 
     public KVStore(String initialAddress, int initialPort) throws IOException {
         this.initialAddress = initialAddress;
@@ -96,7 +93,7 @@ public class KVStore implements KVCommInterface {
             }
             int id = -1;
             try {
-                id = connection.sendRequest(nextId++, key, value, status);
+                id = connection.sendRequest(key, value, status);
             } catch (IOException e) {
                 connection.disconnect();
                 // We re-try the connection; the invalid connection will be removed.
