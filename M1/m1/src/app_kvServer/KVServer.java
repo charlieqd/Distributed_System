@@ -2,6 +2,7 @@ package app_kvServer;
 
 import app_kvECS.ZooKeeperListener;
 import app_kvECS.ZooKeeperService;
+import client.ServerConnection;
 import logger.LogSetup;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Level;
@@ -48,6 +49,8 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
     private final ZooKeeperService zooKeeperService;
 
     private String name;
+
+    private Metadata metaData;
 
     /**
      * Start KV Server at given port
@@ -313,32 +316,68 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
     }
 
     /**
-     *
+     * sendData to next server when moving data
      */
-    public void sendData(ArrayList<String> keys){
-        // lock
+    public boolean sendData(ArrayList<String> keys) throws Exception {
         lockWrite();
+        String successorAddress = metaData.getNextServerAddress();
+        String successorPort = metaData.getNextServerPort();
+        // Make new server connection to successor
+        ServerConnection connection = new ServerConnection(protocol, messageSerializer,  successorAddress, successorPort);
+        try {
+            // NOTE: We ignore metadata for now
+            connection.connect();
+        } catch (Exception e) {
+            logger.error("Failed to connect with next server");
+            return false;
+        }
+        int successCounter = 0;
         for(String key: keys){
-            // from key -> storage.get -> value
             String value;
             try {
                 value = storage.get(key);
             } catch (IOException e) {
                 logger.error("Internal server error: " +
                         Util.getStackTraceString(e));
-                break;
+                return false;
             }
-            // then make new server connection
-
-            // send key value pair to another server
-
-            // if receive seccessful and continue. put_update success
-
+            KVMessage response = null;
+            try{
+                int requestId = connection.sendRequest(key,value,KVMessage.StatusType.PUT);
+                if(requestId < 0){
+                    logger.error("Failed to send put request, key : " + key + "to next server");
+                    return false;
+                }
+                try{
+                    response = connection.receiveMessage(requestId);
+                    KVMessage.StatusType resStatus = response.getStatus();
+                    if(resStatus == KVMessage.StatusType.PUT_SUCCESS || resStatus == KVMessage.StatusType.PUT_UPDATE){
+                        successCounter += 1;
+                        continue;
+                    } else{
+                        logger.error("Failed to send data to next server with status " + resStatus.toString());
+                        return false;
+                    }
+                } catch(Exception e){
+                    logger.error("Failed to receive response from put");
+                    return false;
+                }
+            } catch(Exception e){
+                logger.error("Failed to send key : " + key + "to next server");
+                return false;
+            }
         }
-        // delete all data
-
-        //unlock
-
+        // Delete all data
+        if(successCounter == keys.size()){
+            logger.info("Successful send all data to next server");
+            for(String key : keys){
+                storage.put(key, null);
+            }
+        }else{
+            return false;
+        }
+        unlockWrite();
+        return true;
     }
     /**
      * Transfer a subset (range) of the KVServer’s data to another KVServer
