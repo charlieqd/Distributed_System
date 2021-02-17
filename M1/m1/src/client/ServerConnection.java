@@ -34,6 +34,8 @@ public class ServerConnection {
 
     private boolean neverConnected = true;
 
+    private int nextID = 0;
+
     public ServerConnection(IProtocol protocol,
                             ISerializer<KVMessage> serializer,
                             String address,
@@ -123,7 +125,7 @@ public class ServerConnection {
 
             if (clientSocket != null) {
                 // This must be after setting running = false to avoid infinite recursion
-                sendRequest(-1, null, null, KVMessage.StatusType.DISCONNECT);
+                sendRequest(null, null, KVMessage.StatusType.DISCONNECT);
 
                 clientSocket.close();
                 clientSocket = null;
@@ -187,7 +189,7 @@ public class ServerConnection {
      * Return the ID of the request sent. If request failed to send, return -1.
      * Note that ID given must be non-negative.
      */
-    public int sendRequest(int id, String key, String value,
+    public int sendRequest(String key, String value,
                            KVMessage.StatusType status) throws IOException {
         try {
             KVMessage kvMsg = new KVMessageImpl(key, value, status);
@@ -200,7 +202,9 @@ public class ServerConnection {
                         .getStackTraceString(e));
                 return -1;
             }
+            int id = nextID;
             protocol.writeRequest(output, id, msgBytes);
+            nextID++;
             return id;
         } catch (IOException e) {
             logger.warn("Unable to send message! Disconnected!");

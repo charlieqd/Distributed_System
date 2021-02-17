@@ -3,6 +3,7 @@ package app_kvServer;
 import app_kvECS.ZooKeeperListener;
 import app_kvECS.ZooKeeperService;
 import ecs.ECSController;
+import client.ServerConnection;
 import logger.LogSetup;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Level;
@@ -13,7 +14,9 @@ import shared.IProtocol;
 import shared.ISerializer;
 import shared.Metadata;
 import shared.Protocol;
+import shared.Util;
 import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
@@ -21,6 +24,7 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -28,7 +32,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
 
     private static Logger logger = Logger.getRootLogger();
-    public final AtomicBoolean servering = new AtomicBoolean(false);
+    public final AtomicBoolean serving = new AtomicBoolean(false);
+    public final AtomicBoolean writing = new AtomicBoolean(false);
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
@@ -41,11 +46,12 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
-    private final Lock writeLock;
 
     private final ZooKeeperService zooKeeperService;
 
     private String name;
+
+    private Metadata metaData;
 
     /**
      * Start KV Server at given port
@@ -66,7 +72,6 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
         this.port = port;
         this.zooKeeperService = zooKeeperService;
         zooKeeperService.addListener(this);
-        this.writeLock = new ReentrantLock();
     }
 
     /**
@@ -280,7 +285,7 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
     public void startServing() {
         //After the server has been initialized,
         //the ECS can start the server (call start()).
-        servering.set(true);
+        serving.set(true);
     }
 
     /**
@@ -288,14 +293,13 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * requests are processed.
      */
     public void stopServing() {
-        servering.set(false);
+        serving.set(false);
     }
 
     /**
      * Exits the KVServer application.
      */
     public void shutDown() {
-        // close the big socket
         stopServer();
     }
 
@@ -303,17 +307,80 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * Lock the KVServer for write operations.
      */
     public void lockWrite() {
-        // create a lock and add check in kvstorage
-        writeLock.lock();
+        writing.set(true);
     }
 
     /**
      * Unlock the KVServer for write operations.
      */
     public void unlockWrite() {
-        writeLock.unlock();
+        writing.set(false);
     }
 
+    /**
+     * sendData to next server when moving data
+     */
+    public boolean sendData(ArrayList<String> keys) throws Exception {
+        lockWrite();
+        String successorAddress = metaData.getNextServerAddress();
+        String successorPort = metaData.getNextServerPort();
+        // Make new server connection to successor
+        ServerConnection connection = new ServerConnection(protocol, messageSerializer,  successorAddress, successorPort);
+        try {
+            // NOTE: We ignore metadata for now
+            connection.connect();
+        } catch (Exception e) {
+            logger.error("Failed to connect with next server");
+            return false;
+        }
+        int successCounter = 0;
+        for(String key: keys){
+            String value;
+            try {
+                value = storage.get(key);
+            } catch (IOException e) {
+                logger.error("Internal server error: " +
+                        Util.getStackTraceString(e));
+                return false;
+            }
+            KVMessage response = null;
+            try{
+                int requestId = connection.sendRequest(key,value,KVMessage.StatusType.PUT);
+                if(requestId < 0){
+                    logger.error("Failed to send put request, key : " + key + "to next server");
+                    return false;
+                }
+                try{
+                    response = connection.receiveMessage(requestId);
+                    KVMessage.StatusType resStatus = response.getStatus();
+                    if(resStatus == KVMessage.StatusType.PUT_SUCCESS || resStatus == KVMessage.StatusType.PUT_UPDATE){
+                        successCounter += 1;
+                        continue;
+                    } else{
+                        logger.error("Failed to send data to next server with status " + resStatus.toString());
+                        return false;
+                    }
+                } catch(Exception e){
+                    logger.error("Failed to receive response from put");
+                    return false;
+                }
+            } catch(Exception e){
+                logger.error("Failed to send key : " + key + "to next server");
+                return false;
+            }
+        }
+        // Delete all data
+        if(successCounter == keys.size()){
+            logger.info("Successful send all data to next server");
+            for(String key : keys){
+                storage.put(key, null);
+            }
+        }else{
+            return false;
+        }
+        unlockWrite();
+        return true;
+    }
     /**
      * Transfer a subset (range) of the KVServer’s data to another KVServer
      * (reallocation before removing this server or adding a new KVServer to the

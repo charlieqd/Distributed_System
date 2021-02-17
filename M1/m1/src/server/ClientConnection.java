@@ -123,6 +123,12 @@ public class ClientConnection implements Runnable {
         return responseMessage;
     }
 
+    private KVMessage handleWritingBlock(){
+        KVMessage responseMessage = new KVMessageImpl(null, "Write Locked",
+                KVMessage.StatusType.SERVER_WRITE_LOCK);
+        return responseMessage;
+    }
+
     private void handleMessage(OutputStream output,
                                Request request,
                                KVMessage requestMessage) throws IOException {
@@ -131,8 +137,9 @@ public class ClientConnection implements Runnable {
 
         switch (requestMessage.getStatus()) {
             case DISCONNECT: {
-                if(!server.servering.get()){
+                if(!server.serving.get()){
                     responseMessage = handleNotServing();
+                    break;
                 }else{
                     isOpen = false;
                     logger.info("Client disconnected \t<"
@@ -144,8 +151,9 @@ public class ClientConnection implements Runnable {
             }
 
             case GET: {
-                if(!server.servering.get()){
+                if(!server.serving.get()){
                     responseMessage = handleNotServing();
+                    break;
                 }else {
                     String key = requestMessage.getKey();
                     if (key == null) {
@@ -176,8 +184,10 @@ public class ClientConnection implements Runnable {
             }
 
             case PUT: {
-                if(!server.servering.get()){
+                if(!server.serving.get()){
                     responseMessage = handleNotServing();
+                }else if(server.writing.get()){
+                    responseMessage = handleWritingBlock();
                 }else {
                     String key = requestMessage.getKey();
                     String value = requestMessage.getValue();
@@ -200,32 +210,72 @@ public class ClientConnection implements Runnable {
 
                     responseMessage = new KVMessageImpl(key, value,
                             putResponseType);
-                    break;
                 }
+                break;
             }
 
             case ECS_START_SERVING: {
-
+                try {
+                    server.startServing();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_STOP_SERVING: {
-
+                try {
+                    server.stopServing();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_SHUT_DOWN: {
-
+                try {
+                    server.shutDown();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_LOCK_WRITE: {
-
+                try {
+                    server.lockWrite();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_UNLOCK_WRITE: {
-
+                try {
+                    server.unlockWrite();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e){
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
             }
 
             case ECS_MOVE_DATA: {
-
+                break;
             }
 
             case ECS_UPDATE_METADATA: {
@@ -246,7 +296,7 @@ public class ClientConnection implements Runnable {
                     + clientSocket.getInetAddress()
                     .getHostAddress() + ":"
                     + clientSocket.getPort() + ">: null");
-        } else if(!server.servering.get()){
+        } else if(!server.serving.get()){
             logger.info("Server Stopped");
         } else {
             logger.info("SEND \t<"
