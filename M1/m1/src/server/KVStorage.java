@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -126,9 +127,8 @@ public class KVStorage implements IKVStorage {
                 Paths.get(rootPath, hash).toString()));
     }
 
-    public ArrayList<String> getAllKeys(String hashRangeStart,
-                                        String hashRangeEnd) throws
-            IOException {
+    public List<String> getAllKeys(String hashRangeStart,
+                                   String hashRangeEnd) throws IOException {
         lock.lock();
         try (Stream<Path> paths = Files.walk(Paths.get(this.rootPath))) {
 
@@ -163,9 +163,9 @@ public class KVStorage implements IKVStorage {
                 Util.concatenateArrayLists(keys,
                         storage.readKeys(hashRangeStart, hashRangeEnd));
 
-            });
-
+            }
             return keys;
+
         } finally {
             lock.unlock();
         }

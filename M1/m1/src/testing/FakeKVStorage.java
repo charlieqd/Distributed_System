@@ -3,6 +3,8 @@ package testing;
 import server.IKVStorage;
 import shared.messages.KVMessage;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class FakeKVStorage implements IKVStorage {
@@ -34,5 +36,11 @@ public class FakeKVStorage implements IKVStorage {
 
     @Override
     public void clearCache() {
+    }
+
+    @Override
+    public List<String> getAllKeys(String hashRangeStart,
+                                   String hashRangeEnd) throws IOException {
+        throw new Error("Not implemented");
     }
 }

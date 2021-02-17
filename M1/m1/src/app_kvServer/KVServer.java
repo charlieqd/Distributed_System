@@ -1,22 +1,16 @@
 package app_kvServer;
 
-import app_kvECS.ZooKeeperListener;
 import app_kvECS.ZooKeeperService;
-import ecs.ECSController;
 import client.ServerConnection;
+import ecs.ECSController;
 import logger.LogSetup;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.WatchedEvent;
 import server.*;
-import shared.IProtocol;
-import shared.ISerializer;
-import shared.Metadata;
-import shared.Protocol;
 import shared.Util;
+import shared.*;
 import shared.messages.KVMessage;
-import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
@@ -24,16 +18,13 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicReference;
 
-public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
+public class KVServer extends Thread implements IKVServer {
 
     private static Logger logger = Logger.getRootLogger();
-    public final AtomicBoolean serving = new AtomicBoolean(false);
-    public final AtomicBoolean writing = new AtomicBoolean(false);
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
@@ -51,7 +42,10 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
 
     private String name;
 
-    private Metadata metaData;
+    public final AtomicBoolean serving = new AtomicBoolean(false);
+    public final AtomicBoolean writeLock = new AtomicBoolean(false);
+    public final AtomicReference<Metadata> metadata = new AtomicReference<>(
+            null);
 
     /**
      * Start KV Server at given port
@@ -71,7 +65,6 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
         this.messageSerializer = messageSerializer;
         this.port = port;
         this.zooKeeperService = zooKeeperService;
-        zooKeeperService.addListener(this);
     }
 
     /**
@@ -307,34 +300,45 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
      * Lock the KVServer for write operations.
      */
     public void lockWrite() {
-        writing.set(true);
+        writeLock.set(true);
     }
 
     /**
      * Unlock the KVServer for write operations.
      */
     public void unlockWrite() {
-        writing.set(false);
+        writeLock.set(false);
     }
 
     /**
-     * sendData to next server when moving data
+     * Transfer a subset (range) of the KVServer’s data to another KVServer
+     * (reallocation before removing this server or adding a new KVServer to the
+     * ring); send a notification to the ECS, if data transfer is completed.
+     *
+     * @return if the operation was successful.
      */
-    public boolean sendData(ArrayList<String> keys) throws Exception {
-        lockWrite();
-        String successorAddress = metaData.getNextServerAddress();
-        String successorPort = metaData.getNextServerPort();
+    public boolean moveData(String hashRangeStart,
+                            String hashRangeEnd,
+                            String address,
+                            int port) {
+        List<String> keys = null;
+        try {
+            keys = storage.getAllKeys(hashRangeStart, hashRangeEnd);
+        } catch (IOException e) {
+            logger.error(e);
+            return false;
+        }
         // Make new server connection to successor
-        ServerConnection connection = new ServerConnection(protocol, messageSerializer,  successorAddress, successorPort);
+        ServerConnection connection = new ServerConnection(protocol,
+                messageSerializer, address, port);
         try {
             // NOTE: We ignore metadata for now
             connection.connect();
         } catch (Exception e) {
-            logger.error("Failed to connect with next server");
+            logger.error("Failed to connect with target server");
             return false;
         }
-        int successCounter = 0;
-        for(String key: keys){
+        for (String key : keys) {
             String value;
             try {
                 value = storage.get(key);
@@ -343,65 +347,59 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
                         Util.getStackTraceString(e));
                 return false;
             }
-            KVMessage response = null;
-            try{
-                int requestId = connection.sendRequest(key,value,KVMessage.StatusType.PUT);
-                if(requestId < 0){
-                    logger.error("Failed to send put request, key : " + key + "to next server");
+            try {
+                int requestId = connection
+                        .sendRequest(key, value, KVMessage.StatusType.PUT);
+                if (requestId == -1) {
+                    logger.error(String.format(
+                            "Failed to send put request (key: %s) to target server",
+                            key));
                     return false;
                 }
-                try{
-                    response = connection.receiveMessage(requestId);
-                    KVMessage.StatusType resStatus = response.getStatus();
-                    if(resStatus == KVMessage.StatusType.PUT_SUCCESS || resStatus == KVMessage.StatusType.PUT_UPDATE){
-                        successCounter += 1;
-                        continue;
-                    } else{
-                        logger.error("Failed to send data to next server with status " + resStatus.toString());
+                try {
+                    KVMessage resMessage = connection.receiveMessage(requestId);
+                    KVMessage.StatusType resStatus = resMessage.getStatus();
+                    if (resStatus == KVMessage.StatusType.PUT_SUCCESS ||
+                            resStatus == KVMessage.StatusType.PUT_UPDATE) {
+                        // Success
+                    } else {
+                        logger.error(
+                                "Failed to send data to next server: response status = " + resStatus
+                                        .toString());
                         return false;
                     }
-                } catch(Exception e){
-                    logger.error("Failed to receive response from put");
+                } catch (Exception e) {
+                    logger.error(
+                            "Failed to receive put response from target server");
                     return false;
                 }
-            } catch(Exception e){
-                logger.error("Failed to send key : " + key + "to next server");
+            } catch (Exception e) {
+                logger.error(String.format(
+                        "Failed to send put request (key: %s) to target server",
+                        key));
                 return false;
             }
         }
+
         // Delete all data
-        if(successCounter == keys.size()){
-            logger.info("Successful send all data to next server");
-            for(String key : keys){
+        logger.info("Successfully sent all data to target server. Deleting...");
+        for (String key : keys) {
+            try {
                 storage.put(key, null);
+            } catch (Exception e) {
+                logger.error(
+                        String.format("Failed to delete tuple (key %s)", key));
             }
-        }else{
-            return false;
         }
-        unlockWrite();
+        logger.info("Transferred tuples deleted.");
+
         return true;
-    }
-    /**
-     * Transfer a subset (range) of the KVServer’s data to another KVServer
-     * (reallocation before removing this server or adding a new KVServer to the
-     * ring); send a notification to the ECS, if data transfer is completed.
-     */
-    public void moveData(String hashRangeStart,
-                         String hashRangeEnd,
-                         String host,
-                         int port) {
-        throw new Error("Not implemented");
     }
 
     /**
      * Update the metadata repository of this server
      */
     public void updateMetadata(Metadata metadata) {
-        throw new Error("Not implemented");
-    }
-
-    @Override
-    public void handleZooKeeperEvent(WatchedEvent event) {
-
+        this.metadata.set(metadata);
     }
 }

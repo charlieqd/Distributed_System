@@ -161,12 +161,14 @@ public class KVStore implements KVCommInterface {
     }
 
     private void processNewMetadata(Metadata metadata) {
+        // If metadata is null, that means the server who sent the metadata did
+        // not know any metadata at all.
+        if (metadata == null) return;
+
         for (ServerConnection connection : connections.values()) {
             connection.disconnect();
         }
         connections.clear();
-
-        if (metadata == null) return;
 
         for (ECSNode info : metadata.getServers()) {
             ServerConnection connection = new ServerConnection(protocol,
