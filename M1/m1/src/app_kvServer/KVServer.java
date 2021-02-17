@@ -12,7 +12,9 @@ import shared.IProtocol;
 import shared.ISerializer;
 import shared.Metadata;
 import shared.Protocol;
+import shared.Util;
 import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
@@ -20,6 +22,7 @@ import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -309,6 +312,34 @@ public class KVServer extends Thread implements IKVServer, ZooKeeperListener {
         writing.set(false);
     }
 
+    /**
+     *
+     */
+    public void sendData(ArrayList<String> keys){
+        // lock
+        lockWrite();
+        for(String key: keys){
+            // from key -> storage.get -> value
+            String value;
+            try {
+                value = storage.get(key);
+            } catch (IOException e) {
+                logger.error("Internal server error: " +
+                        Util.getStackTraceString(e));
+                break;
+            }
+            // then make new server connection
+
+            // send key value pair to another server
+
+            // if receive seccessful and continue. put_update success
+
+        }
+        // delete all data
+
+        //unlock
+
+    }
     /**
      * Transfer a subset (range) of the KVServer’s data to another KVServer
      * (reallocation before removing this server or adding a new KVServer to the
