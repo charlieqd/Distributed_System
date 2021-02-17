@@ -91,6 +91,10 @@ public class ServerConnection {
                                 "Connection error: server did not acknowledge connection");
                     }
                     KVMessage message = serializer.decode(msgByte);
+                    if (message.getStatus() != KVMessage.StatusType.CONNECTED) {
+                        throw new IllegalStateException(
+                                "Connection error: server did not acknowledge connection");
+                    }
                     metadata = message.getMetadata();
                     logger.info("Connection Established!");
                 } else {

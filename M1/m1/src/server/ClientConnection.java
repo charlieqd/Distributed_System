@@ -60,7 +60,8 @@ public class ClientConnection implements Runnable {
             input = clientSocket.getInputStream();
 
             sendResponse(output, null, Response.Status.CONNECTION_ESTABLISHED,
-                    null);
+                    new KVMessageImpl(null, null, server.metadata.get(),
+                            KVMessage.StatusType.CONNECTED));
 
             while (isOpen && server.isRunning()) {
                 try {
@@ -128,6 +129,24 @@ public class ClientConnection implements Runnable {
                 KVMessage.StatusType.SERVER_WRITE_LOCK);
     }
 
+    private boolean isResponsibleForKey(String key) {
+        String nodeName = server.getNodeName();
+        if (nodeName == null) {
+            logger.error("Server name is null");
+            return false;
+        }
+        Metadata metadata = server.metadata.get();
+        if (metadata == null) return false;
+
+        ECSNode node = metadata.getServer(Metadata.getRingPosition(key));
+        return node != null && nodeName.equals(node.getNodeName());
+    }
+
+    private KVMessage handleNotResponsible() {
+        return new KVMessageImpl(null, null, server.metadata.get(),
+                KVMessage.StatusType.NOT_RESPONSIBLE);
+    }
+
     private void handleMessage(OutputStream output,
                                Request request,
                                KVMessage requestMessage) throws IOException {
@@ -145,16 +164,17 @@ public class ClientConnection implements Runnable {
             }
 
             case GET: {
+                String key = requestMessage.getKey();
+                if (key == null) {
+                    responseMessage = new KVMessageImpl(null, "Invalid key",
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
                 if (!server.serving.get()) {
                     responseMessage = handleNotServing();
-                    break;
+                } else if (!isResponsibleForKey(key)) {
+                    responseMessage = handleNotResponsible();
                 } else {
-                    String key = requestMessage.getKey();
-                    if (key == null) {
-                        responseMessage = new KVMessageImpl(null, "Invalid key",
-                                KVMessage.StatusType.FAILED);
-                        break;
-                    }
                     String value;
                     try {
                         value = storage.get(key);
@@ -168,28 +188,30 @@ public class ClientConnection implements Runnable {
                     if (value == null) {
                         responseMessage = new KVMessageImpl(key, null,
                                 KVMessage.StatusType.GET_ERROR);
-                        break;
                     } else {
                         responseMessage = new KVMessageImpl(key, value,
                                 KVMessage.StatusType.GET_SUCCESS);
-                        break;
                     }
+                    break;
                 }
+                break;
             }
 
             case PUT: {
+                String key = requestMessage.getKey();
+                if (key == null) {
+                    responseMessage = new KVMessageImpl(null, "Invalid key",
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
                 if (!server.serving.get()) {
                     responseMessage = handleNotServing();
+                } else if (!isResponsibleForKey(key)) {
+                    responseMessage = handleNotResponsible();
                 } else if (server.writeLock.get()) {
                     responseMessage = handleWriteLocked();
                 } else {
-                    String key = requestMessage.getKey();
                     String value = requestMessage.getValue();
-                    if (key == null) {
-                        responseMessage = new KVMessageImpl(null, "Invalid key",
-                                KVMessage.StatusType.FAILED);
-                        break;
-                    }
 
                     KVMessage.StatusType putResponseType;
                     try {

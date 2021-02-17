@@ -105,6 +105,10 @@ public class KVServer extends Thread implements IKVServer {
         return this.running;
     }
 
+    public String getNodeName() {
+        return name;
+    }
+
     /**
      * Stops the server insofar that it won't listen at the given port any
      * more.

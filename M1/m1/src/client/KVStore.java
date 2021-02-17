@@ -14,12 +14,7 @@ import java.util.Map;
 
 public class KVStore implements KVCommInterface {
 
-    /**
-     * Initialize KVStore with address and port of KVServer
-     *
-     * @param address the address of the KVServer
-     * @param port    the port of the KVServer
-     */
+    public static final int MAX_NUM_ATTEMPTS = 10;
 
     private Logger logger = Logger.getRootLogger();
 
@@ -85,7 +80,10 @@ public class KVStore implements KVCommInterface {
                                   String value,
                                   KVMessage.StatusType status) throws
             Exception {
-        while (true) {
+        int attemptCount = 0;
+        while (attemptCount < MAX_NUM_ATTEMPTS) {
+            attemptCount++;
+
             ServerConnection connection = getOrCreateServerConnection(key);
             if (connection == null) {
                 return new KVMessageImpl(null, "Request failed: disconnected.",
@@ -112,6 +110,9 @@ public class KVStore implements KVCommInterface {
             }
             return message;
         }
+        return new KVMessageImpl(null,
+                "Failed to send request: Too many retries",
+                KVMessage.StatusType.FAILED);
     }
 
     /**
