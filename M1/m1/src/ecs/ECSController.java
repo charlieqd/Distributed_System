@@ -44,7 +44,7 @@ public class ECSController implements ZooKeeperListener {
         }
     }
 
-    public static final String ZOO_KEEPER_ROOT = "kvECS";
+    public static final String ZOO_KEEPER_ROOT = "/kvECS";
 
     public static final long LAUNCH_TIMEOUT_MS = 10000;
 
@@ -589,7 +589,7 @@ public class ECSController implements ZooKeeperListener {
 
         for (String nodeName : children) {
             // TODO remove me
-            System.out.println("========== name");
+            System.out.println("========== TODO remove me name");
             System.out.println(nodeName);
             String[] components = nodeName.split("/");
             nodeName = components[components.length - 1];

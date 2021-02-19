@@ -30,7 +30,7 @@ public class KVServer extends Thread implements IKVServer {
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     private static final String DEFAULT_PORT = "8080";
     private static final String DEFAULT_DATA_PATH = "data";
-    private static final String DEFAULT_LOG_LEVEL = "ALL";
+    private static final String DEFAULT_LOG_LEVEL = "INFO";
 
     private int port;
     private ServerSocket serverSocket;
@@ -80,7 +80,7 @@ public class KVServer extends Thread implements IKVServer {
 
         if (serverSocket != null) {
             String node = String
-                    .format("/%s/%s", ECSController.ZOO_KEEPER_ROOT, name);
+                    .format("%s/%s", ECSController.ZOO_KEEPER_ROOT, name);
 
             // Notify ECS about server starting
             try {
