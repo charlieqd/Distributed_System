@@ -6,6 +6,8 @@ import shared.IProtocol;
 import shared.ISerializer;
 import shared.messages.KVMessage;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 public class ECSNodeState {
     public enum Status {
         /**
@@ -23,32 +25,56 @@ public class ECSNodeState {
          * The server is successfully launched and a socket connection has been
          * established.
          */
-        LAUNCHED
+        LAUNCHED,
+
+        /**
+         * The server is successfully launched and a socket connection has been
+         * established. However, the server is not yet added to the list of
+         * active servers, which means it will not receive requests yet.
+         */
+        CONNECTED,
+
+        /**
+         * The server is successfully setup and added to the list of active
+         * servers.
+         */
+        ACTIVATED
     }
 
-    private Status status = Status.NOT_LAUNCHED;
+    private AtomicReference<Status> status = new AtomicReference<>(
+            Status.NOT_LAUNCHED);
 
     private final ServerConnection connection;
+
+    private ECSNode node;
 
     public ECSNodeState(IProtocol protocol,
                         ISerializer<KVMessage> serializer,
                         ECSNode node) {
+        this.node = node;
         connection = new ServerConnection(protocol,
                 serializer,
                 node.getNodeHost(),
                 node.getNodePort());
     }
 
-    public Status getStatus() {
+    public AtomicReference<Status> getStatus() {
         return status;
     }
 
-    public void setStatus(Status status) {
-        this.status = status;
+    public ECSNode getNode() {
+        return node;
     }
 
     public ServerConnection getConnection() {
         return connection;
     }
 
+    @Override
+    public String toString() {
+        return "ECSNodeState{" +
+                "status=" + status.get().name() +
+                ", connectionValid=" + connection.isConnectionValid() +
+                '}';
+    }
 }

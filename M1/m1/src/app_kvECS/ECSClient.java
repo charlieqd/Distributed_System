@@ -7,7 +7,6 @@ import org.apache.log4j.Logger;
 import shared.IProtocol;
 import shared.ISerializer;
 import shared.Protocol;
-import shared.messages.IECSNode;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageSerializer;
 
@@ -15,97 +14,30 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Collection;
-import java.util.Map;
 
-public class ECSClient implements IECSClient {
+public class ECSClient {
 
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECS Client> ";
+    private static final String DEFAULT_CACHE_STRATEGY = "LRU";
+    private static final int DEFAULT_CACHE_SIZE = 8192;
     private final InputStream input;
     private BufferedReader stdin;
     private boolean stop = false;
 
     private final ECSController controller;
 
-    private final String DEFAULT_ZOOKEEPER_URL = "127.0.0.1:2181";
+    private static final String DEFAULT_ZOOKEEPER_URL = "127.0.0.1:2181";
 
     public ECSClient(IProtocol protocol,
                      ISerializer<KVMessage> serializer,
-                     InputStream inputStream, String configPath) throws
-            IOException {
+                     InputStream inputStream,
+                     String configPath,
+                     ZooKeeperService zooKeeperService) throws
+            Exception {
         this.input = inputStream;
-        this.controller = new ECSController(protocol, serializer, configPath, DEFAULT_ZOOKEEPER_URL);
-    }
-
-    @Override
-    public boolean start() {
-        // TODO
-        return false;
-    }
-
-    @Override
-    public boolean stop() {
-        // TODO
-        return false;
-    }
-
-    @Override
-    public boolean shutdown() {
-        // TODO
-        return false;
-    }
-
-    @Override
-    public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        try {
-            return controller.addNode(cacheStrategy, cacheSize);
-        } catch (Exception e) {
-            printError("Unable to add node: " + e.getMessage());
-            return null;
-        }
-    }
-
-    @Override
-    public Collection<IECSNode> addNodes(int count, String cacheStrategy,
-                                         int cacheSize) {
-        try {
-            return controller.addNodes(count, cacheStrategy, cacheSize);
-        } catch (Exception e) {
-            printError("Unable to add nodes: " + e.getMessage());
-            return null;
-        }
-    }
-
-    @Override
-    public Collection<IECSNode> setupNodes(int count, String cacheStrategy,
-                                           int cacheSize) {
-        // TODO
-        return null;
-    }
-
-    @Override
-    public boolean awaitNodes(int count, int timeout) throws Exception {
-        // TODO
-        return false;
-    }
-
-    @Override
-    public boolean removeNodes(Collection<String> nodeNames) {
-        // TODO
-        return false;
-    }
-
-    @Override
-    public Map<String, IECSNode> getNodes() {
-        // TODO
-        return null;
-    }
-
-    @Override
-    public IECSNode getNodeByKey(String Key) {
-        // TODO
-        return null;
+        this.controller = new ECSController(protocol, serializer, configPath,
+                zooKeeperService);
     }
 
     public boolean connectionValid() {
@@ -118,7 +50,7 @@ public class ECSClient implements IECSClient {
         if (tokens[0].equals("shutdown")) {
             if (tokens.length == 1) {
                 stop = true;
-                shutdown();
+                controller.shutdownAllNodes();
                 System.out.println("Application exit!");
             } else {
                 printError("Invalid number of parameters!");
@@ -126,24 +58,43 @@ public class ECSClient implements IECSClient {
 
         } else if (tokens[0].equals("start")) {
             if (tokens.length == 1) {
-                start();
+                controller.start();
             } else {
                 printError("Invalid number of parameters!");
             }
 
         } else if (tokens[0].equals("stop")) {
             if (tokens.length == 1) {
-                stop();
+                controller.stop();
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
+        } else if (tokens[0].equals("list")) {
+            if (tokens.length == 1) {
+                controller.printServerStatuses();
             } else {
                 printError("Invalid number of parameters!");
             }
 
         } else if (tokens[0].equals("addnodes")) {
             if (tokens.length == 2) {
-                int nodesNum = Integer.parseInt(tokens[1]);
-                String cacheStrategy = tokens[2];
-                int cacheSize = Integer.parseInt(tokens[3]);
-                addNodes(nodesNum, cacheStrategy, cacheSize);
+                try {
+                    int nodesNum = Integer.parseInt(tokens[1]);
+                    controller.addNodes(nodesNum, DEFAULT_CACHE_STRATEGY,
+                            DEFAULT_CACHE_SIZE);
+                } catch (NumberFormatException e) {
+                    printError("Invalid integer");
+                }
+            } else if (tokens.length == 4) {
+                try {
+                    int nodesNum = Integer.parseInt(tokens[1]);
+                    String cacheStrategy = tokens[2];
+                    int cacheSize = Integer.parseInt(tokens[3]);
+                    controller.addNodes(nodesNum, cacheStrategy, cacheSize);
+                } catch (NumberFormatException e) {
+                    printError("Invalid integer");
+                }
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -162,11 +113,16 @@ public class ECSClient implements IECSClient {
             }
 
         } else if (tokens[0].equals("addnode")) {
-            if (tokens.length == 3) {
-                String cacheStrategy = tokens[1];
-                int cacheSize = Integer.parseInt(tokens[2]);
-                addNode(cacheStrategy, cacheSize);
-                System.out.println("Add node");
+            if (tokens.length == 1) {
+                controller.addNode(DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
+            } else if (tokens.length == 3) {
+                try {
+                    String cacheStrategy = tokens[1];
+                    int cacheSize = Integer.parseInt(tokens[2]);
+                    controller.addNode(cacheStrategy, cacheSize);
+                } catch (NumberFormatException e) {
+                    printError("Invalid integer");
+                }
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -195,14 +151,16 @@ public class ECSClient implements IECSClient {
         sb.append("ECS CLIENT HELP (Usage):\n");
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
-        sb.append("addnode");
+        sb.append("addnode [cacheStrategy] [cacheSize]");
         sb.append("\t add a single node to the system\n");
-        sb.append("addnodes <count>");
+        sb.append("addnodes <count> [cacheStrategy] [cacheSize]");
         sb.append("\t add a given number of nodes to the system\n");
         sb.append("start");
         sb.append("\t signal all servers to start serving\n");
         sb.append("stop");
         sb.append("\t signal all servers to stop serving\n");
+        sb.append("list");
+        sb.append("\t print server statuses for debug\n");
         sb.append("removenode <index>");
         sb.append("\t remove a server from the system\n");
         sb.append("shutdown");
@@ -226,6 +184,9 @@ public class ECSClient implements IECSClient {
                 logger.error("Failed to read from command line", e);
                 printError(
                         "ECS Client does not respond - Application terminated ");
+            } catch (Exception e) {
+                stop = true;
+                logger.error("Failed to read from command line", e);
             }
 
             System.out.println("");
@@ -243,7 +204,7 @@ public class ECSClient implements IECSClient {
         }
 
         try {
-            new LogSetup("logs/ecsclient.log", Level.ERROR);
+            new LogSetup("logs/ecsclient.log", Level.WARN);
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");
             e.printStackTrace();
@@ -254,8 +215,11 @@ public class ECSClient implements IECSClient {
         IProtocol protocol = new Protocol();
         ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
 
+        ZooKeeperService zooKeeperService = new ZooKeeperService(
+                DEFAULT_ZOOKEEPER_URL);
+
         ECSClient ecsApp = new ECSClient(protocol, messageSerializer, System.in,
-                configPath);
+                configPath, zooKeeperService);
         ecsApp.run();
     }
 }

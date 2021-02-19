@@ -153,7 +153,9 @@ public class ClientConnection implements Runnable {
 
         KVMessage responseMessage = null;
 
-        switch (requestMessage.getStatus()) {
+        KVMessage.StatusType requestStatus = requestMessage.getStatus();
+
+        switch (requestStatus) {
             case DISCONNECT: {
                 isOpen = false;
                 logger.info("Client disconnected \t<"
@@ -197,6 +199,7 @@ public class ClientConnection implements Runnable {
                 break;
             }
 
+            case ECS_PUT:
             case PUT: {
                 String key = requestMessage.getKey();
                 if (key == null) {
@@ -204,11 +207,15 @@ public class ClientConnection implements Runnable {
                             KVMessage.StatusType.FAILED);
                     break;
                 }
-                if (!server.serving.get()) {
+
+                // An ECS_PUT will bypass all checks
+                boolean isClientPut = requestStatus == KVMessage.StatusType.PUT;
+
+                if (isClientPut && !server.serving.get()) {
                     responseMessage = handleNotServing();
-                } else if (!isResponsibleForKey(key)) {
+                } else if (isClientPut && !isResponsibleForKey(key)) {
                     responseMessage = handleNotResponsible();
-                } else if (server.writeLock.get()) {
+                } else if (isClientPut && server.writeLock.get()) {
                     responseMessage = handleWriteLocked();
                 } else {
                     String value = requestMessage.getValue();
@@ -258,7 +265,7 @@ public class ClientConnection implements Runnable {
                 break;
             }
 
-            case ECS_SHUT_DOWN: {
+            case ECS_SHUTDOWN: {
                 try {
                     server.shutDown();
                     responseMessage = new KVMessageImpl(null, null,
@@ -300,11 +307,11 @@ public class ClientConnection implements Runnable {
                 break;
             }
 
-            case ECS_MOVE_DATA: {
+            case ECS_COPY_DATA: {
                 try {
                     MoveDataArgs arg = (MoveDataArgs) requestMessage
                             .getECSCommandArg();
-                    boolean success = server.moveData(arg.getHashRangeStart(),
+                    boolean success = server.copyDataTo(arg.getHashRangeStart(),
                             arg.getHashRangeEnd(), arg.getAddress(),
                             arg.getPort());
                     if (success) {
@@ -312,7 +319,30 @@ public class ClientConnection implements Runnable {
                                 KVMessage.StatusType.ECS_SUCCESS);
                     } else {
                         responseMessage = new KVMessageImpl(null,
-                                "Failed to move data",
+                                "Failed to copy data",
+                                KVMessage.StatusType.FAILED);
+                    }
+                } catch (Exception e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error: " + Util
+                                    .getStackTraceString(e),
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
+            }
+
+            case ECS_DELETE_DATA: {
+                try {
+                    MoveDataArgs arg = (MoveDataArgs) requestMessage
+                            .getECSCommandArg();
+                    boolean success = server.deleteData(arg.getHashRangeStart(),
+                            arg.getHashRangeEnd());
+                    if (success) {
+                        responseMessage = new KVMessageImpl(null, null,
+                                KVMessage.StatusType.ECS_SUCCESS);
+                    } else {
+                        responseMessage = new KVMessageImpl(null,
+                                "Failed to delete data",
                                 KVMessage.StatusType.FAILED);
                     }
                 } catch (Exception e) {

@@ -5,29 +5,107 @@ import shared.Metadata;
 public interface KVMessage {
 
     public enum StatusType {
-        CONNECTED,          /* Received when first connected */
-        DISCONNECT,         /* Ask server to disconnect */
-        GET,                /* Get - request */
-        GET_ERROR,          /* requested tuple (i.e. value) not found */
-        GET_SUCCESS,        /* requested tuple (i.e. value) found */
-        PUT,                /* Put - request */
-        PUT_SUCCESS,        /* Put - request successful, tuple inserted */
-        PUT_UPDATE,         /* Put - request successful, i.e. value updated */
-        PUT_ERROR,          /* Put - request not successful */
-        DELETE_SUCCESS,     /* Delete - request successful */
-        DELETE_ERROR,       /* Delete - request successful */
-        NOT_RESPONSIBLE,    /* server not responsible for the key */
-        SERVER_WRITE_LOCK,  /* server has locked write operations */
-        SERVER_STOPPED,     /* server is stopped */
-        ECS_SUCCESS,        /* ECS: signal to ECS that the last command was successful */
-        ECS_START_SERVING,  /* ECS: order this server to allow all client requests */
-        ECS_STOP_SERVING,   /* ECS: order this server to block all client requests */
-        ECS_SHUT_DOWN,      /* ECS: order this server to shut down */
-        ECS_LOCK_WRITE,     /* ECS: order this server to lock write operations */
-        ECS_UNLOCK_WRITE,   /* ECS: order this server to unlock write operations */
-        ECS_MOVE_DATA,      /* ECS: order this server to transfer data */
-        ECS_UPDATE_METADATA,/* ECS: update metadata cache */
-        FAILED              /* Any other error */
+        /**
+         * Received when first connected
+         */
+        CONNECTED,
+        /**
+         * Ask server to disconnect
+         */
+        DISCONNECT,
+        /**
+         * Get - request
+         */
+        GET,
+        /**
+         * requested tuple (i.e. value) not found
+         */
+        GET_ERROR,
+        /**
+         * requested tuple (i.e. value) found
+         */
+        GET_SUCCESS,
+        /**
+         * Put - request
+         */
+        PUT,
+        /**
+         * Put - request successful, tuple inserted
+         */
+        PUT_SUCCESS,
+        /**
+         * Put - request successful, i.e. value updated
+         */
+        PUT_UPDATE,
+        /**
+         * Put - request not successful
+         */
+        PUT_ERROR,
+        /**
+         * Delete - request successful
+         */
+        DELETE_SUCCESS,
+        /**
+         * Delete - request successful
+         */
+        DELETE_ERROR,
+        /**
+         * server not responsible for the key
+         */
+        NOT_RESPONSIBLE,
+        /**
+         * server has locked write operations
+         */
+        SERVER_WRITE_LOCK,
+        /**
+         * server is stopped
+         */
+        SERVER_STOPPED,
+        /**
+         * A special PUT request used during data transfer, to avoid serving
+         * lock and write lock
+         */
+        ECS_PUT,
+        /**
+         * ECS: signal to ECS that the last command was successful
+         */
+        ECS_SUCCESS,
+        /**
+         * ECS: order this server to allow all client requests
+         */
+        ECS_START_SERVING,
+        /**
+         * ECS: order this server to block all client requests
+         */
+        ECS_STOP_SERVING,
+        /**
+         * ECS: order this server to shutdown
+         */
+        ECS_SHUTDOWN,
+        /**
+         * ECS: order this server to lock write operations
+         */
+        ECS_LOCK_WRITE,
+        /**
+         * ECS: order this server to unlock write operations
+         */
+        ECS_UNLOCK_WRITE,
+        /**
+         * ECS: order this server to transfer data
+         */
+        ECS_COPY_DATA,
+        /**
+         * ECS: order this server to delete data
+         */
+        ECS_DELETE_DATA,
+        /**
+         * ECS: update metadata cache
+         */
+        ECS_UPDATE_METADATA,
+        /**
+         * Any other error
+         */
+        FAILED
     }
 
     /**
@@ -49,7 +127,7 @@ public interface KVMessage {
     public Metadata getMetadata();
 
     /**
-     * @return the arguments for ECS commands (e.g. ECS_MOVE_DATA); null if this
+     * @return the arguments for ECS commands (e.g. ECS_COPY_DATA); null if this
      * message is not an ECS message or if the ECS message has no argument (e.g.
      * ECS_START_SERVING).
      */

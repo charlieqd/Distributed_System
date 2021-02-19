@@ -18,14 +18,16 @@ public class ZooKeeperService {
 
     private ZooKeeper zooKeeper;
 
-    private List<ZooKeeperListener> listeners = new ArrayList<>();
+    private final List<ZooKeeperListener> listeners = new ArrayList<>();
 
     private class ProcessNodeWatcher implements Watcher {
 
         @Override
         public void process(WatchedEvent event) {
-            for (ZooKeeperListener l : listeners) {
-                l.handleZooKeeperEvent(event);
+            synchronized (listeners) {
+                for (ZooKeeperListener l : listeners) {
+                    l.handleZooKeeperEvent(event);
+                }
             }
         }
     }
@@ -38,27 +40,32 @@ public class ZooKeeperService {
                 DEFAULT_TIMEOUT, new ProcessNodeWatcher());
     }
 
+    public String getURL() {
+        return url;
+    }
 
-    public String createNode(final String node, final boolean watch,
+    public String createNode(final String node,
                              byte[] data,
-                             final boolean ephemeral) {
+                             final boolean ephemeral) throws Exception {
         String createdNodePath = null;
         try {
-            final Stat nodeStat = zooKeeper.exists(node, watch);
+            final Stat nodeStat = zooKeeper.exists(node, false);
 
-            CreateMode mode = ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
+            CreateMode mode =
+                    ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
             if (nodeStat == null) {
                 createdNodePath = zooKeeper.create(node, data,
-                        ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                        ZooDefs.Ids.OPEN_ACL_UNSAFE, mode);
             }
         } catch (KeeperException | InterruptedException e) {
-            throw new IllegalStateException(e);
+            throw new Exception(e);
         }
 
         return createdNodePath;
     }
 
-    public boolean watchNode(final String node, final boolean watch) {
+    public boolean watchNode(final String node, final boolean watch) throws
+            Exception {
         boolean watched = false;
         try {
             final Stat nodeStat = zooKeeper.exists(node, watch);
@@ -67,31 +74,33 @@ public class ZooKeeperService {
                 watched = true;
             }
         } catch (KeeperException | InterruptedException e) {
-            throw new IllegalArgumentException(e);
+            throw new Exception(e);
         }
 
         return watched;
     }
 
-    public List<String> watchChildren(final String root) {
+    public List<String> getChildren(final String root, boolean watch) throws
+            Exception {
         try {
-            return zooKeeper.getChildren(root, true);
+            return zooKeeper.getChildren(root, watch);
         } catch (KeeperException | InterruptedException e) {
-            throw new IllegalStateException(e);
+            throw new Exception(e);
         }
     }
 
-
-    public void removeNode(final String node) {
+    public void removeNode(final String node) throws Exception {
         try {
             zooKeeper.delete(node, -1);
         } catch (KeeperException | InterruptedException e) {
-            throw new IllegalStateException(e);
+            throw new Exception(e);
         }
     }
 
     public void addListener(ZooKeeperListener listener) {
-        listeners.add(listener);
+        synchronized (listeners) {
+            listeners.add(listener);
+        }
     }
 
 }

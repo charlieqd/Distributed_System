@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ServerConnection {
     private Logger logger = Logger.getRootLogger();
 
-    private static final int SOCKET_TIMEOUT_SECONDS = 30;
+    private static final int DEFAULT_SOCKET_TIMEOUT_SECONDS = 30;
 
     public Thread watcher = null;
     public final AtomicBoolean terminated = new AtomicBoolean(false);
@@ -157,9 +157,14 @@ public class ServerConnection {
     }
 
     public KVMessage receiveMessage(int requestID) throws Exception {
+        return receiveMessage(requestID, DEFAULT_SOCKET_TIMEOUT_SECONDS);
+    }
+
+    public KVMessage receiveMessage(int requestID, int timeoutSeconds) throws
+            Exception {
         while (true) {
             Response res = watcherQueue
-                    .poll(SOCKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    .poll(timeoutSeconds, TimeUnit.SECONDS);
             if (res == null) {
                 return new KVMessageImpl(null, "Request timed out.",
                         KVMessage.StatusType.FAILED);

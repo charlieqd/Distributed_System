@@ -102,19 +102,23 @@ public class KVMessageImpl implements KVMessage, Serializable {
                 return statusName;
             case SERVER_STOPPED:
                 return statusName;
+            case ECS_PUT:
+                return statusName + "<" + key + "," + value + ">";
             case ECS_SUCCESS:
                 return statusName;
             case ECS_START_SERVING:
                 return statusName;
             case ECS_STOP_SERVING:
                 return statusName;
-            case ECS_SHUT_DOWN:
+            case ECS_SHUTDOWN:
                 return statusName;
             case ECS_LOCK_WRITE:
                 return statusName;
             case ECS_UNLOCK_WRITE:
                 return statusName;
-            case ECS_MOVE_DATA:
+            case ECS_COPY_DATA:
+                return statusName + "<(ecsCommandArg)>";
+            case ECS_DELETE_DATA:
                 return statusName + "<(ecsCommandArg)>";
             case ECS_UPDATE_METADATA:
                 return statusName + "<(metadata)>";

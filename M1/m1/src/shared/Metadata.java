@@ -23,9 +23,9 @@ public class Metadata implements Serializable {
     }
 
     // sorted
-    private ArrayList<ECSNode> servers;
+    private List<ECSNode> servers;
 
-    public Metadata(ArrayList<ECSNode> servers) {
+    public Metadata(List<ECSNode> servers) {
         this.servers = new ArrayList<>(servers);
         Collections.sort(this.servers);
     }
@@ -39,6 +39,26 @@ public class Metadata implements Serializable {
             return null;
         }
         return binarySearch(ringPosition);
+    }
+
+    public ECSNode getPredecessor(ECSNode node) {
+        if (servers.size() == 0) {
+            return null;
+        }
+        int index = -1;
+        for (int i = 0; i < servers.size(); ++i) {
+            if (servers.get(i) == node) {
+                index = i;
+                break;
+            }
+        }
+        if (index == -1) {
+            return null;
+        }
+        if (index == 0) {
+            return servers.get(servers.size() - 1);
+        }
+        return servers.get(index - 1);
     }
 
     public ECSNode binarySearch(String ringPosition) {
@@ -69,8 +89,6 @@ public class Metadata implements Serializable {
         }
 
         return servers.get(left);
-
-
     }
 
     public static String getRingPosition(String key) {
@@ -78,4 +96,10 @@ public class Metadata implements Serializable {
         return String.format("%032x", new BigInteger(1, bytes));
     }
 
+    @Override
+    public String toString() {
+        return "Metadata{" +
+                "servers=" + servers +
+                '}';
+    }
 }

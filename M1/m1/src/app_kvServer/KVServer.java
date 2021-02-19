@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -80,7 +81,15 @@ public class KVServer extends Thread implements IKVServer {
         if (serverSocket != null) {
             String node = String
                     .format("/%s/%s", ECSController.ZOO_KEEPER_ROOT, name);
-            zooKeeperService.createNode(node, false, new byte[0], true);
+
+            // Notify ECS about server starting
+            try {
+                zooKeeperService.createNode(node, new byte[0], true);
+            } catch (Exception e) {
+                logger.error("Failed to write ZooKeeperNode", e);
+                return;
+            }
+
             while (isRunning()) {
                 try {
                     Socket client = serverSocket.accept();
@@ -176,7 +185,7 @@ public class KVServer extends Thread implements IKVServer {
             HelpFormatter formatter = new HelpFormatter();
             Level logLevel;
             String rootPath;
-            String url;
+            String zooKeeperUrl;
             String name;
 
             try {
@@ -219,7 +228,7 @@ public class KVServer extends Thread implements IKVServer {
                 logLevel = Level
                         .toLevel(cmd.getOptionValue("l", DEFAULT_LOG_LEVEL));
 
-                url = cmd.getOptionValue("z");
+                zooKeeperUrl = cmd.getOptionValue("z");
                 name = cmd.getOptionValue("n");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -228,7 +237,7 @@ public class KVServer extends Thread implements IKVServer {
                 return;
             }
 
-            new LogSetup("logs/server.log", logLevel);
+            new LogSetup(String.format("logs/server_%s.log", name), logLevel);
 
             KeyHashStrategy keyHashStrategy = null;
 
@@ -240,11 +249,13 @@ public class KVServer extends Thread implements IKVServer {
                 System.exit(1);
             }
 
-            IKVStorage storage = new KVStorage(rootPath, keyHashStrategy,
+            IKVStorage storage = new KVStorage(
+                    Paths.get(rootPath, name).toString(), keyHashStrategy,
                     cacheSize, cacheStrategy);
             IProtocol protocol = new Protocol();
             ISerializer<KVMessage> messageSerializer = new KVMessageSerializer();
-            ZooKeeperService zooKeeperService = new ZooKeeperService(url);
+            ZooKeeperService zooKeeperService = new ZooKeeperService(
+                    zooKeeperUrl);
 
             new KVServer(storage, protocol, messageSerializer, port,
                     name, zooKeeperService)
@@ -321,10 +332,10 @@ public class KVServer extends Thread implements IKVServer {
      *
      * @return if the operation was successful.
      */
-    public boolean moveData(String hashRangeStart,
-                            String hashRangeEnd,
-                            String address,
-                            int port) {
+    public boolean copyDataTo(String hashRangeStart,
+                              String hashRangeEnd,
+                              String address,
+                              int port) {
         List<String> keys = null;
         try {
             keys = storage.getAllKeys(hashRangeStart, hashRangeEnd);
@@ -353,7 +364,7 @@ public class KVServer extends Thread implements IKVServer {
             }
             try {
                 int requestId = connection
-                        .sendRequest(key, value, KVMessage.StatusType.PUT);
+                        .sendRequest(key, value, KVMessage.StatusType.ECS_PUT);
                 if (requestId == -1) {
                     logger.error(String.format(
                             "Failed to send put request (key: %s) to target server",
@@ -385,19 +396,30 @@ public class KVServer extends Thread implements IKVServer {
             }
         }
 
-        // Delete all data
-        logger.info("Successfully sent all data to target server. Deleting...");
+        logger.info("Successfully sent all data to target server.");
+        return true;
+    }
+
+    public boolean deleteData(String hashRangeStart, String hashRangeEnd) {
+        List<String> keys = null;
+        try {
+            keys = storage.getAllKeys(hashRangeStart, hashRangeEnd);
+        } catch (IOException e) {
+            logger.error(e);
+            return false;
+        }
+        boolean success = true;
         for (String key : keys) {
             try {
                 storage.put(key, null);
             } catch (Exception e) {
                 logger.error(
                         String.format("Failed to delete tuple (key %s)", key));
+                success = false;
             }
         }
-        logger.info("Transferred tuples deleted.");
-
-        return true;
+        logger.info("Tuples deleted.");
+        return success;
     }
 
     /**
