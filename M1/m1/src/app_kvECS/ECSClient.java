@@ -50,14 +50,15 @@ public class ECSClient {
         if (tokens[0].equals("shutdown")) {
             if (tokens.length == 1) {
                 stop = true;
+                System.out.println("Shutting down all active nodes...");
                 controller.shutdownAllNodes();
-                System.out.println("Application exit!");
             } else {
                 printError("Invalid number of parameters!");
             }
 
         } else if (tokens[0].equals("start")) {
             if (tokens.length == 1) {
+                System.out.println("Starting all active nodes...");
                 controller.start();
             } else {
                 printError("Invalid number of parameters!");
@@ -65,6 +66,7 @@ public class ECSClient {
 
         } else if (tokens[0].equals("stop")) {
             if (tokens.length == 1) {
+                System.out.println("Stopping all active nodes...");
                 controller.stop();
             } else {
                 printError("Invalid number of parameters!");
@@ -79,6 +81,7 @@ public class ECSClient {
 
         } else if (tokens[0].equals("addnodes")) {
             if (tokens.length == 2) {
+                System.out.println("Adding nodes...");
                 try {
                     int nodesNum = Integer.parseInt(tokens[1]);
                     controller.addNodes(nodesNum, DEFAULT_CACHE_STRATEGY,
@@ -87,6 +90,7 @@ public class ECSClient {
                     printError("Invalid integer");
                 }
             } else if (tokens.length == 4) {
+                System.out.println("Adding nodes...");
                 try {
                     int nodesNum = Integer.parseInt(tokens[1]);
                     String cacheStrategy = tokens[2];
@@ -114,8 +118,10 @@ public class ECSClient {
 
         } else if (tokens[0].equals("addnode")) {
             if (tokens.length == 1) {
+                System.out.println("Adding node...");
                 controller.addNode(DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
             } else if (tokens.length == 3) {
+                System.out.println("Adding node...");
                 try {
                     String cacheStrategy = tokens[1];
                     int cacheSize = Integer.parseInt(tokens[2]);
@@ -129,7 +135,9 @@ public class ECSClient {
 
         } else if (tokens[0].equals("removenode")) {
             if (tokens.length == 2) {
-                //To do
+                System.out.println("Removing node...");
+                String nodeName = tokens[1];
+                controller.removeNode(nodeName);
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -178,7 +186,12 @@ public class ECSClient {
             System.out.print(PROMPT);
             try {
                 String cmdLine = stdin.readLine();
-                this.handleCommand(cmdLine);
+                try {
+                    this.handleCommand(cmdLine);
+                } catch (Exception e) {
+                    printError("Internal server error while handling command");
+                    logger.error(e);
+                }
             } catch (IOException e) {
                 stop = true;
                 logger.error("Failed to read from command line", e);

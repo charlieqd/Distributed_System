@@ -382,8 +382,6 @@ public class ClientConnection implements Runnable {
                     + clientSocket.getInetAddress()
                     .getHostAddress() + ":"
                     + clientSocket.getPort() + ">: null");
-        } else if (!server.serving.get()) {
-            logger.info("Server Stopped");
         } else {
             logger.info("SEND \t<"
                     + clientSocket.getInetAddress()

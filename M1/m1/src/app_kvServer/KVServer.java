@@ -347,57 +347,63 @@ public class KVServer extends Thread implements IKVServer {
         ServerConnection connection = new ServerConnection(protocol,
                 messageSerializer, address, port);
         try {
-            // NOTE: We ignore metadata for now
-            connection.connect();
-        } catch (Exception e) {
-            logger.error("Failed to connect with target server");
-            return false;
-        }
-        for (String key : keys) {
-            String value;
             try {
-                value = storage.get(key);
-            } catch (IOException e) {
-                logger.error("Internal server error: " +
-                        Util.getStackTraceString(e));
+                // NOTE: We ignore metadata for now
+                connection.connect();
+            } catch (Exception e) {
+                logger.error("Failed to connect with target server");
                 return false;
             }
-            try {
-                int requestId = connection
-                        .sendRequest(key, value, KVMessage.StatusType.ECS_PUT);
-                if (requestId == -1) {
+            for (String key : keys) {
+                String value;
+                try {
+                    value = storage.get(key);
+                } catch (IOException e) {
+                    logger.error("Internal server error: " +
+                            Util.getStackTraceString(e));
+                    return false;
+                }
+                try {
+                    int requestId = connection
+                            .sendRequest(key, value,
+                                    KVMessage.StatusType.ECS_PUT);
+                    if (requestId == -1) {
+                        logger.error(String.format(
+                                "Failed to send put request (key: %s) to target server",
+                                key));
+                        return false;
+                    }
+                    try {
+                        KVMessage resMessage = connection
+                                .receiveMessage(requestId);
+                        KVMessage.StatusType resStatus = resMessage.getStatus();
+                        if (resStatus == KVMessage.StatusType.PUT_SUCCESS ||
+                                resStatus == KVMessage.StatusType.PUT_UPDATE) {
+                            // Success
+                        } else {
+                            logger.error(
+                                    "Failed to send data to next server: response status = " + resStatus
+                                            .toString());
+                            return false;
+                        }
+                    } catch (Exception e) {
+                        logger.error(
+                                "Failed to receive put response from target server");
+                        return false;
+                    }
+                } catch (Exception e) {
                     logger.error(String.format(
                             "Failed to send put request (key: %s) to target server",
                             key));
                     return false;
                 }
-                try {
-                    KVMessage resMessage = connection.receiveMessage(requestId);
-                    KVMessage.StatusType resStatus = resMessage.getStatus();
-                    if (resStatus == KVMessage.StatusType.PUT_SUCCESS ||
-                            resStatus == KVMessage.StatusType.PUT_UPDATE) {
-                        // Success
-                    } else {
-                        logger.error(
-                                "Failed to send data to next server: response status = " + resStatus
-                                        .toString());
-                        return false;
-                    }
-                } catch (Exception e) {
-                    logger.error(
-                            "Failed to receive put response from target server");
-                    return false;
-                }
-            } catch (Exception e) {
-                logger.error(String.format(
-                        "Failed to send put request (key: %s) to target server",
-                        key));
-                return false;
             }
-        }
 
-        logger.info("Successfully sent all data to target server.");
-        return true;
+            logger.info("Successfully sent all data to target server.");
+            return true;
+        } finally {
+            connection.disconnect();
+        }
     }
 
     public boolean deleteData(String hashRangeStart, String hashRangeEnd) {

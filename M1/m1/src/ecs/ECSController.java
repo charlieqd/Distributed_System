@@ -110,16 +110,32 @@ public class ECSController implements ZooKeeperListener {
         // Launch node
 
         Process proc;
-        String script = String
-                .format("invoke_server.sh %s %s %s %d %s %s",
-                        node.getNodeHost(),
-                        node.getNodePort(), cacheStrategy, cacheSize,
-                        zooKeeperService.getURL(), node.getNodeName());
+        String[] script = {
+                "bash",
+                "invoke_server.sh",
+                node.getNodeHost(),
+                String.format("%d", node.getNodePort()),
+                cacheStrategy,
+                String.format("%d", cacheSize),
+                zooKeeperService.getURL(),
+                node.getNodeName()
+        };
 
         Runtime run = Runtime.getRuntime();
         try {
             proc = run.exec(script);
-        } catch (IOException e) {
+            proc.waitFor();
+            int exitStatus = proc.exitValue();
+            if (exitStatus != 0) {
+                String msg = String
+                        .format("Failed to add node (name: %s, host: %s, port: %s), SSH call exited with non-zero status (%d)",
+                                node.getNodeName(), node.getNodeHost(),
+                                node.getNodePort(), exitStatus);
+                logger.error(msg);
+                state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+                return false;
+            }
+        } catch (IOException | InterruptedException e) {
             String msg = String
                     .format("Failed to add node, name: %s, host: %s, port: %s",
                             node.getNodeName(), node.getNodeHost(),
@@ -350,6 +366,17 @@ public class ECSController implements ZooKeeperListener {
 
         state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
 
+        // Remove the corresponding znode
+
+        try {
+            zooKeeperService.removeNode(
+                    String.format("%s/%s", ECSController.ZOO_KEEPER_ROOT,
+                            node.getNodeName()));
+        } catch (Exception e) {
+            logger.error("Unable to remove znode", e);
+            success = false;
+        }
+
         // Update metadata on all nodes
 
         logger.info("Updating metadata of all nodes");
@@ -379,7 +406,7 @@ public class ECSController implements ZooKeeperListener {
                     .format("Not enough available nodes to add. Number of available node: %s",
                             availableToAdd.size());
             logger.error(msg);
-            throw new IllegalStateException(msg);
+            return;
         }
 
         for (int i = 0; i < count; i++) {

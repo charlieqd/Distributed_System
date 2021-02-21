@@ -181,7 +181,7 @@ public class ServerConnection {
 
                 try {
                     KVMessage message = serializer.decode(msgByte);
-                    logger.info("Received message: " + message.toString());
+                    logger.debug("Received message: " + message.toString());
                     return message;
                 } catch (Exception e) {
                     logger.warn("Failed to decode message", e);
