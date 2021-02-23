@@ -4,6 +4,7 @@ import ecs.ECSController;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import shared.ECSNode;
 import shared.IProtocol;
 import shared.ISerializer;
 import shared.Protocol;
@@ -14,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
 
 public class ECSClient {
 
@@ -80,12 +82,15 @@ public class ECSClient {
             }
 
         } else if (tokens[0].equals("addnodes")) {
+            List<ECSNode> nodes = null;
+
             if (tokens.length == 2) {
                 System.out.println("Adding nodes...");
                 try {
                     int nodesNum = Integer.parseInt(tokens[1]);
-                    controller.addNodes(nodesNum, DEFAULT_CACHE_STRATEGY,
-                            DEFAULT_CACHE_SIZE);
+                    nodes = controller
+                            .addNodes(nodesNum, DEFAULT_CACHE_STRATEGY,
+                                    DEFAULT_CACHE_SIZE);
                 } catch (NumberFormatException e) {
                     printError("Invalid integer");
                 }
@@ -95,12 +100,23 @@ public class ECSClient {
                     int nodesNum = Integer.parseInt(tokens[1]);
                     String cacheStrategy = tokens[2];
                     int cacheSize = Integer.parseInt(tokens[3]);
-                    controller.addNodes(nodesNum, cacheStrategy, cacheSize);
+                    nodes = controller
+                            .addNodes(nodesNum, cacheStrategy, cacheSize);
                 } catch (NumberFormatException e) {
                     printError("Invalid integer");
                 }
             } else {
                 printError("Invalid number of parameters!");
+            }
+
+            if (nodes != null) {
+                System.out.println("Nodes added:");
+                for (ECSNode node : nodes) {
+                    System.out
+                            .printf("- name: %s, address: %s, port: %d\n",
+                                    node.getNodeName(), node.getNodeHost(),
+                                    node.getNodePort());
+                }
             }
 
         } else if (tokens[0].equals("logLevel")) {
@@ -117,20 +133,29 @@ public class ECSClient {
             }
 
         } else if (tokens[0].equals("addnode")) {
+            ECSNode node = null;
             if (tokens.length == 1) {
                 System.out.println("Adding node...");
-                controller.addNode(DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
+                node = controller
+                        .addNode(DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
             } else if (tokens.length == 3) {
                 System.out.println("Adding node...");
                 try {
                     String cacheStrategy = tokens[1];
                     int cacheSize = Integer.parseInt(tokens[2]);
-                    controller.addNode(cacheStrategy, cacheSize);
+                    node = controller.addNode(cacheStrategy, cacheSize);
                 } catch (NumberFormatException e) {
                     printError("Invalid integer");
                 }
             } else {
                 printError("Invalid number of parameters!");
+            }
+
+            if (node != null) {
+                System.out
+                        .printf("Node added: name: %s, address: %s, port: %d\n",
+                                node.getNodeName(), node.getNodeHost(),
+                                node.getNodePort());
             }
 
         } else if (tokens[0].equals("removenode")) {

@@ -56,6 +56,8 @@ public class ClientConnection implements Runnable {
      */
     public void run() {
         try {
+            server.registerClientConnection(this);
+
             output = clientSocket.getOutputStream();
             input = clientSocket.getInputStream();
 
@@ -106,7 +108,7 @@ public class ClientConnection implements Runnable {
             logger.error("Error: Connection could not be established.", ioe);
 
         } finally {
-
+            server.unregisterClientConnection(this);
             try {
                 if (clientSocket != null) {
                     input.close();
@@ -116,6 +118,14 @@ public class ClientConnection implements Runnable {
             } catch (IOException ioe) {
                 logger.error("Error: Unable to tear down connection.", ioe);
             }
+        }
+    }
+
+    public void disconnect() {
+        try {
+            clientSocket.close();
+        } catch (IOException e) {
+            logger.error("Failed to close client socket", e);
         }
     }
 
@@ -154,6 +164,8 @@ public class ClientConnection implements Runnable {
         KVMessage responseMessage = null;
 
         KVMessage.StatusType requestStatus = requestMessage.getStatus();
+
+        boolean shouldShutdown = false;
 
         switch (requestStatus) {
             case DISCONNECT: {
@@ -266,16 +278,10 @@ public class ClientConnection implements Runnable {
             }
 
             case ECS_SHUTDOWN: {
-                try {
-                    server.shutDown();
-                    responseMessage = new KVMessageImpl(null, null,
-                            KVMessage.StatusType.ECS_SUCCESS);
-                } catch (Exception e) {
-                    responseMessage = new KVMessageImpl(null,
-                            "Internal server error: " + Util
-                                    .getStackTraceString(e),
-                            KVMessage.StatusType.FAILED);
-                }
+                // We first respond to the client, then shutdown the server.
+                shouldShutdown = true;
+                responseMessage = new KVMessageImpl(null, null,
+                        KVMessage.StatusType.ECS_SUCCESS);
                 break;
             }
 
@@ -392,6 +398,14 @@ public class ClientConnection implements Runnable {
 
         sendResponse(output, request, Response.Status.OK,
                 responseMessage);
+
+        if (shouldShutdown) {
+            try {
+                server.shutDown();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**

@@ -121,6 +121,13 @@ public class ServerConnection {
     }
 
     public void disconnect() {
+        disconnect(false);
+    }
+
+    /**
+     * @param silent whether to ignore all errors
+     */
+    public void disconnect(boolean silent) {
         if (!running) {
             return;
         }
@@ -134,12 +141,18 @@ public class ServerConnection {
 
             if (clientSocket != null) {
                 // This must be after setting running = false to avoid infinite recursion
-                sendRequest(null, null, KVMessage.StatusType.DISCONNECT);
+                try {
+                    sendRequest(null, null, KVMessage.StatusType.DISCONNECT);
+                } catch (Exception ignored) {
+                    // Silence exceptions
+                }
 
                 clientSocket.close();
             }
         } catch (IOException ioe) {
-            logger.error("Unable to close socket!", ioe);
+            if (!silent) {
+                logger.error("Unable to close socket!", ioe);
+            }
         } finally {
             clientSocket = null;
             if (watcher != null) {
@@ -181,7 +194,9 @@ public class ServerConnection {
 
                 try {
                     KVMessage message = serializer.decode(msgByte);
-                    logger.debug("Received message: " + message.toString());
+                    logger.debug(
+                            String.format("Received message (from %s:%d): ",
+                                    address, port) + message.toString());
                     return message;
                 } catch (Exception e) {
                     logger.warn("Failed to decode message", e);
@@ -216,7 +231,8 @@ public class ServerConnection {
      */
     public int sendRequest(KVMessage message) throws IOException {
         try {
-            logger.debug("Sending message: " + message.toString());
+            logger.debug(String.format("Sending message (to %s:%d): ", address,
+                    port) + message.toString());
             byte[] msgBytes;
             try {
                 msgBytes = serializer.encode(message);
@@ -230,7 +246,10 @@ public class ServerConnection {
             nextID++;
             return id;
         } catch (IOException e) {
-            logger.warn("Unable to send message! Disconnected!");
+            // Don't warn if sending the disconnect request
+            if (message.getStatus() != KVMessage.StatusType.DISCONNECT) {
+                logger.warn("Unable to send message! Disconnected!");
+            }
             disconnect();
             throw e;
         }

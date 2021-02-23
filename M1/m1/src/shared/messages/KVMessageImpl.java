@@ -117,9 +117,9 @@ public class KVMessageImpl implements KVMessage, Serializable {
             case ECS_UNLOCK_WRITE:
                 return statusName;
             case ECS_COPY_DATA:
-                return statusName + "<(ecsCommandArg)>";
+                return statusName + "<(" + ecsCommandArg.toString() + ")>";
             case ECS_DELETE_DATA:
-                return statusName + "<(ecsCommandArg)>";
+                return statusName + "<(" + ecsCommandArg.toString() + ")>";
             case ECS_UPDATE_METADATA:
                 return statusName + "<(metadata)>";
             case FAILED:

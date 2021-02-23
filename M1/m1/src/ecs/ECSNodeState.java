@@ -72,9 +72,7 @@ public class ECSNodeState {
 
     @Override
     public String toString() {
-        return "ECSNodeState{" +
-                "status=" + status.get().name() +
-                ", connectionValid=" + connection.isConnectionValid() +
-                '}';
+        return String.format("status: %s, connection valid = " + connection
+                .isConnectionValid(), status.get().name());
     }
 }

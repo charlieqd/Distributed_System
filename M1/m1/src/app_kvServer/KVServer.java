@@ -19,7 +19,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -47,6 +49,8 @@ public class KVServer extends Thread implements IKVServer {
     public final AtomicBoolean writeLock = new AtomicBoolean(false);
     public final AtomicReference<Metadata> metadata = new AtomicReference<>(
             null);
+
+    private final Set<ClientConnection> clientConnections = new HashSet<>();
 
     /**
      * Start KV Server at given port
@@ -118,6 +122,26 @@ public class KVServer extends Thread implements IKVServer {
         return name;
     }
 
+    public void registerClientConnection(ClientConnection connection) {
+        synchronized (clientConnections) {
+            clientConnections.add(connection);
+        }
+    }
+
+    public void unregisterClientConnection(ClientConnection connection) {
+        synchronized (clientConnections) {
+            clientConnections.remove(connection);
+        }
+    }
+
+    public void disconnectClientConnections() {
+        synchronized (clientConnections) {
+            for (ClientConnection connection : clientConnections) {
+                connection.disconnect();
+            }
+        }
+    }
+
     /**
      * Stops the server insofar that it won't listen at the given port any
      * more.
@@ -126,6 +150,7 @@ public class KVServer extends Thread implements IKVServer {
         running = false;
         try {
             serverSocket.close();
+            disconnectClientConnections();
         } catch (IOException e) {
             logger.error("Error! " +
                     "Unable to close socket on port: " + port, e);

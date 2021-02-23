@@ -166,6 +166,8 @@ public class KVStore implements KVCommInterface {
         // not know any metadata at all.
         if (metadata == null) return;
 
+        logger.info("Received new metadata. Refreshing connections...");
+
         for (ServerConnection connection : connections.values()) {
             connection.disconnect();
         }

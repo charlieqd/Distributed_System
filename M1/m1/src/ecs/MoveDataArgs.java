@@ -35,4 +35,13 @@ public class MoveDataArgs implements Serializable {
         return port;
     }
 
+    @Override
+    public String toString() {
+        return "MoveDataArgs{" +
+                "hashRangeStart='" + hashRangeStart + '\'' +
+                ", hashRangeEnd='" + hashRangeEnd + '\'' +
+                ", address='" + address + '\'' +
+                ", port=" + port +
+                '}';
+    }
 }
