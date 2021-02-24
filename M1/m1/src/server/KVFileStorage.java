@@ -1,5 +1,6 @@
 package server;
 
+import shared.Metadata;
 import shared.Util;
 import shared.messages.KVMessage;
 
@@ -56,16 +57,18 @@ public class KVFileStorage implements IKVFileStorage {
                     line = reader.readLine();
                     continue;
                 }
+                String key = data.get(0);
+                String keyHash = Metadata.getRingPosition(key);
                 if (hashRangeStart.compareTo(hashRangeEnd) > 0) {
-                    if (data.get(0).compareTo(hashRangeStart) > 0 || data.get(0)
+                    if (keyHash.compareTo(hashRangeStart) > 0 || keyHash
                             .compareTo(hashRangeEnd) <= 0) {
-                        keys.add(data.get(0));
+                        keys.add(key);
                     }
                 } else {
-                    if (data.get(0).compareTo(hashRangeStart) > 0 && data.get(0)
+                    if (keyHash.compareTo(hashRangeStart) > 0 && keyHash
                             .compareTo(hashRangeEnd) <= 0) {
 
-                        keys.add(data.get(0));
+                        keys.add(key);
                     }
                 }
                 line = reader.readLine();

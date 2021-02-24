@@ -126,8 +126,9 @@ public class KVStore implements KVCommInterface {
             Exception {
         String ringPosition = Metadata.getRingPosition(key);
         ServerConnection connection = null;
+        ECSNode info = null;
         if (cachedMetadata != null) {
-            ECSNode info = cachedMetadata.getServer(ringPosition);
+            info = cachedMetadata.getServer(ringPosition);
             if (info != null) {
                 ringPosition = info.getPosition();
                 connection = connections.get(ringPosition);
@@ -148,6 +149,10 @@ public class KVStore implements KVCommInterface {
                 if (connection.isConnectionValid()) {
                     return connection;
                 } else {
+                    if (info != null) {
+                        logger.info(String.format("Connection to %s invalid",
+                                info.getNodeName()));
+                    }
                     connections.remove(ringPosition);
                     connection = null;
                 }
