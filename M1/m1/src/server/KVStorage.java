@@ -87,7 +87,7 @@ public class KVStorage implements IKVStorage {
                 value = fileStorage.read(key);
 
                 cache.put(key, value == null ? NULL_VALUE : value);
-                logger.info("Cache missed for key \"" + key + "\"");
+                logger.debug("Cache missed for key \"" + key + "\"");
             }
             return value == NULL_VALUE ? null : value;
         } finally {

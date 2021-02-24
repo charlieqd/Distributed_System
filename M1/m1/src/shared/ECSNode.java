@@ -51,7 +51,7 @@ public class ECSNode implements Comparable<ECSNode>, IECSNode, Serializable {
     @Override
     public String toString() {
         return String
-                .format("%s at %s:%d, hash = %s", name, host, port, position);
+                .format("%s at %s:%d (hash = %s)", name, host, port, position);
     }
 
     public static String getRingPosition(String host, int port) {

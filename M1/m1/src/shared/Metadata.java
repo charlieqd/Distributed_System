@@ -12,11 +12,10 @@ public class Metadata implements Serializable {
 
     private static final long serialVersionUID = 2654489690409479031L;
 
-    private static MessageDigest hashGenerator;
-
     static {
         try {
-            hashGenerator = MessageDigest.getInstance("MD5");
+            // Check if MD5 algorithm exists
+            MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
             throw new Error(Util.getStackTraceString(e));
         }
@@ -92,6 +91,12 @@ public class Metadata implements Serializable {
     }
 
     public static String getRingPosition(String key) {
+        MessageDigest hashGenerator;
+        try {
+            hashGenerator = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new Error(Util.getStackTraceString(e));
+        }
         byte[] bytes = hashGenerator.digest(key.getBytes());
         return String.format("%032x", new BigInteger(1, bytes));
     }

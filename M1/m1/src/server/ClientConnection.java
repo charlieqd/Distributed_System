@@ -74,7 +74,7 @@ public class ClientConnection implements Runnable {
 
                     KVMessage requestMessage = readMessage(request);
                     if (requestMessage == null) {
-                        logger.info("RECEIVE \t<"
+                        logger.debug("RECEIVE \t<"
                                 + clientSocket.getInetAddress()
                                 .getHostAddress() + ":"
                                 + clientSocket
@@ -86,7 +86,7 @@ public class ClientConnection implements Runnable {
                         continue;
                     }
 
-                    logger.info("RECEIVE \t<"
+                    logger.debug("RECEIVE \t<"
                             + clientSocket.getInetAddress()
                             .getHostAddress() + ":"
                             + clientSocket.getPort() + ">: '"
@@ -384,16 +384,20 @@ public class ClientConnection implements Runnable {
         }
 
         if (responseMessage == null) {
-            logger.info("SEND \t<"
-                    + clientSocket.getInetAddress()
-                    .getHostAddress() + ":"
-                    + clientSocket.getPort() + ">: null");
+            if (logger.isDebugEnabled()) {
+                logger.debug("SEND \t<"
+                        + clientSocket.getInetAddress()
+                        .getHostAddress() + ":"
+                        + clientSocket.getPort() + ">: null");
+            }
         } else {
-            logger.info("SEND \t<"
-                    + clientSocket.getInetAddress()
-                    .getHostAddress() + ":"
-                    + clientSocket.getPort() + ">: '"
-                    + responseMessage.toString() + "'");
+            if (logger.isDebugEnabled()) {
+                logger.debug("SEND \t<"
+                        + clientSocket.getInetAddress()
+                        .getHostAddress() + ":"
+                        + clientSocket.getPort() + ">: '"
+                        + responseMessage.toString() + "'");
+            }
         }
 
         sendResponse(output, request, Response.Status.OK,

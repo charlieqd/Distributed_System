@@ -194,9 +194,11 @@ public class ServerConnection {
 
                 try {
                     KVMessage message = serializer.decode(msgByte);
-                    logger.debug(
-                            String.format("Received message (from %s:%d): ",
-                                    address, port) + message.toString());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(
+                                String.format("Received message (from %s:%d): ",
+                                        address, port) + message.toString());
+                    }
                     return message;
                 } catch (Exception e) {
                     logger.warn("Failed to decode message", e);
@@ -231,8 +233,11 @@ public class ServerConnection {
      */
     public int sendRequest(KVMessage message) throws IOException {
         try {
-            logger.debug(String.format("Sending message (to %s:%d): ", address,
-                    port) + message.toString());
+            if (logger.isDebugEnabled()) {
+                logger.debug(
+                        String.format("Sending message (to %s:%d): ", address,
+                                port) + message.toString());
+            }
             byte[] msgBytes;
             try {
                 msgBytes = serializer.encode(message);

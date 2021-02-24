@@ -123,4 +123,8 @@ public class Util {
             a.add(i);
         }
     }
+
+    public static String safeToString(Object o) {
+        return o == null ? "null" : o.toString();
+    }
 }

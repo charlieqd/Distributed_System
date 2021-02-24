@@ -1,6 +1,7 @@
 package shared.messages;
 
 import shared.Metadata;
+import shared.Util;
 
 import java.io.Serializable;
 
@@ -75,7 +76,7 @@ public class KVMessageImpl implements KVMessage, Serializable {
 
         switch (status) {
             case CONNECTED:
-                return statusName + "<(metadata)>";
+                return statusName + "<(" + Util.safeToString(metadata) + ")>";
             case DISCONNECT:
                 return statusName;
             case GET:
@@ -97,7 +98,7 @@ public class KVMessageImpl implements KVMessage, Serializable {
             case DELETE_ERROR:
                 return statusName + "<" + key + ">";
             case NOT_RESPONSIBLE:
-                return statusName + "<(metadata)>";
+                return statusName + "<(" + Util.safeToString(metadata) + ")>";
             case SERVER_WRITE_LOCK:
                 return statusName;
             case SERVER_STOPPED:
@@ -117,11 +118,13 @@ public class KVMessageImpl implements KVMessage, Serializable {
             case ECS_UNLOCK_WRITE:
                 return statusName;
             case ECS_COPY_DATA:
-                return statusName + "<(" + ecsCommandArg.toString() + ")>";
+                return statusName + "<(" + Util
+                        .safeToString(ecsCommandArg) + ")>";
             case ECS_DELETE_DATA:
-                return statusName + "<(" + ecsCommandArg.toString() + ")>";
+                return statusName + "<(" + Util
+                        .safeToString(ecsCommandArg) + ")>";
             case ECS_UPDATE_METADATA:
-                return statusName + "<(metadata)>";
+                return statusName + "<(" + Util.safeToString(metadata) + ")>";
             case FAILED:
                 return statusName + "<" + value + ">";
         }

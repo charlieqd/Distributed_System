@@ -582,39 +582,39 @@ public class ECSController implements ZooKeeperListener {
             ECSNodeState state = getNodeState(node);
             ServerConnection connection = state.getConnection();
             successes[i] = false;
-            if (connection.isConnectionValid()) {
-                if (requestIDs[i] != -1) {
-                    try {
-                        KVMessage resMessage = connection
-                                .receiveMessage(requestIDs[i], timeoutSeconds);
-                        if (resMessage
-                                .getStatus() == KVMessage.StatusType.ECS_SUCCESS) {
-                            // Success
-                            successes[i] = true;
-                            successCount++;
-                        } else {
-                            logger.error(String.format(
-                                    "Node %s responded with failure: " +
-                                            resMessage.getValue(),
-                                    node.getNodeName()));
-                        }
-                    } catch (Exception e) {
-                        // TODO Server stopped unexpectedly. Unhandled for now
+            // if (connection.isConnectionValid()) {
+            if (requestIDs[i] != -1) {
+                try {
+                    KVMessage resMessage = connection
+                            .receiveMessage(requestIDs[i], timeoutSeconds);
+                    if (resMessage
+                            .getStatus() == KVMessage.StatusType.ECS_SUCCESS) {
+                        // Success
+                        successes[i] = true;
+                        successCount++;
+                    } else {
                         logger.error(String.format(
-                                "Unable to receive message from %s",
+                                "Node %s responded with failure: " +
+                                        resMessage.getValue(),
                                 node.getNodeName()));
                     }
-                } else {
+                } catch (Exception e) {
+                    // TODO Server stopped unexpectedly. Unhandled for now
                     logger.error(String.format(
-                            "Unable to send message to %s",
+                            "Unable to receive message from %s",
                             node.getNodeName()));
                 }
             } else {
-                // TODO Server stopped unexpectedly. Unhandled for now
                 logger.error(String.format(
-                        "Connection of %s not valid",
+                        "Unable to send message to %s",
                         node.getNodeName()));
             }
+            // } else {
+            //     // TODO Server stopped unexpectedly. Unhandled for now
+            //     logger.error(String.format(
+            //             "Connection of %s not valid",
+            //             node.getNodeName()));
+            // }
         }
 
         logger.info(String.format("%d/%d requests succeeded.", successCount,
