@@ -40,6 +40,7 @@ public class AllTests {
                     Arrays.asList(
                             new ECSNode("testServer", "127.0.0.1", 50000))));
             server.startServing();
+            Thread.sleep(1000);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -36,7 +36,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private int port;
     private ServerSocket serverSocket;
-    private boolean running;
+    private AtomicBoolean running = new AtomicBoolean(false);
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
@@ -80,7 +80,7 @@ public class KVServer extends Thread implements IKVServer {
     public void run() {
         //Options options = new Options();
 
-        running = initializeServer();
+        running.set(initializeServer());
 
         if (serverSocket != null) {
             String node = String
@@ -108,16 +108,19 @@ public class KVServer extends Thread implements IKVServer {
                             + client.getInetAddress().getHostName()
                             + " on port " + client.getPort());
                 } catch (IOException e) {
-                    logger.error("Error! " +
-                            "Unable to establish connection. \n", e);
+                    if (isRunning()) {
+                        logger.error("Error! " +
+                                "Unable to establish connection. \n", e);
+                    }
                 }
             }
         }
+        running.set(false);
         logger.info("Server stopped.");
     }
 
     public boolean isRunning() {
-        return this.running;
+        return this.running.get();
     }
 
     public String getNodeName() {
@@ -149,7 +152,9 @@ public class KVServer extends Thread implements IKVServer {
      * more.
      */
     private void stopServer() {
-        running = false;
+        if (!running.get()) return;
+
+        running.set(false);
         try {
             serverSocket.close();
             disconnectClientConnections();

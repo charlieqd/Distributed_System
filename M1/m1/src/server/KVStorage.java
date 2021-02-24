@@ -23,8 +23,6 @@ public class KVStorage implements IKVStorage {
 
     private static final String NULL_VALUE = new String();
 
-    private static KVStorage current = null;
-
     private final ConcurrentHashMap<String, IKVFileStorage> files = new ConcurrentHashMap<>();
 
     private final KeyHashStrategy keyHashStrategy;
@@ -47,10 +45,6 @@ public class KVStorage implements IKVStorage {
     public KVStorage(String rootPath, KeyHashStrategy keyHashStrategy,
                      int cacheSize, IKVServer.CacheStrategy cacheStrategy) {
         this.rootPath = rootPath;
-        if (current != null) {
-            throw new IllegalStateException(
-                    "Cannot have more than one KVStorage instance");
-        }
 
         // Make directories
         File file = new File(this.rootPath);
@@ -59,7 +53,6 @@ public class KVStorage implements IKVStorage {
         }
 
         this.keyHashStrategy = keyHashStrategy;
-        current = this;
 
         // set up cache
         if (cacheStrategy == IKVServer.CacheStrategy.FIFO) {
