@@ -11,8 +11,12 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import server.KVStorage;
 import server.MD5PrefixKeyHashStrategy;
+import shared.ECSNode;
+import shared.Metadata;
 import shared.Protocol;
 import shared.messages.KVMessageSerializer;
+
+import java.util.Arrays;
 
 
 @RunWith(Suite.class)
@@ -27,10 +31,15 @@ public class AllTests {
         try {
             String rootPath = folder.newFolder("data").toString();
             new LogSetup("logs/testing/test.log", Level.ERROR);
-            new KVServer(
+            KVServer server = new KVServer(
                     new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
                             1024, IKVServer.CacheStrategy.LRU), new Protocol(),
-                    new KVMessageSerializer(), 50000).start();
+                    new KVMessageSerializer(), 50000, "testServer", null);
+            server.start();
+            server.updateMetadata(new Metadata(
+                    Arrays.asList(
+                            new ECSNode("testServer", "127.0.0.1", 50000))));
+            server.startServing();
         } catch (Exception e) {
             e.printStackTrace();
         }

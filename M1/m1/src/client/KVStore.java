@@ -86,8 +86,8 @@ public class KVStore implements KVCommInterface {
 
             ServerConnection connection = getOrCreateServerConnection(key);
             if (connection == null) {
-                return new KVMessageImpl(null, "Request failed: disconnected.",
-                        KVMessage.StatusType.FAILED);
+                disconnect();
+                throw new IOException("Request failed: disconnected.");
             }
             int id = -1;
             try {

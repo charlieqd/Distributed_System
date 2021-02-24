@@ -87,11 +87,13 @@ public class KVServer extends Thread implements IKVServer {
                     .format("%s/%s", ECSController.ZOO_KEEPER_ROOT, name);
 
             // Notify ECS about server starting
-            try {
-                zooKeeperService.createNode(node, new byte[0], true);
-            } catch (Exception e) {
-                logger.error("Failed to write ZooKeeperNode", e);
-                return;
+            if (zooKeeperService != null) {
+                try {
+                    zooKeeperService.createNode(node, new byte[0], true);
+                } catch (Exception e) {
+                    logger.error("Failed to write ZooKeeperNode", e);
+                    return;
+                }
             }
 
             while (isRunning()) {

@@ -12,6 +12,8 @@ import org.junit.runners.Parameterized;
 import server.IKVStorage;
 import server.KVStorage;
 import server.MD5PrefixKeyHashStrategy;
+import shared.ECSNode;
+import shared.Metadata;
 import shared.Protocol;
 import shared.messages.KVMessageSerializer;
 
@@ -47,9 +49,14 @@ public class PerformanceTest {
             new LogSetup("logs/testing/test.log", Level.ERROR);
             storage = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
                     CACHE_SIZE, IKVServer.CacheStrategy.LRU);
-            new KVServer(
+            KVServer server = new KVServer(
                     storage, new Protocol(),
-                    new KVMessageSerializer(), 50000).start();
+                    new KVMessageSerializer(), 50000, "testServer", null);
+            server.start();
+            server.updateMetadata(new Metadata(
+                    Arrays.asList(
+                            new ECSNode("testServer", "127.0.0.1", 50000))));
+            server.startServing();
         } catch (Exception e) {
             e.printStackTrace();
         }

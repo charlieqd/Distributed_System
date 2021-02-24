@@ -16,6 +16,7 @@ import shared.messages.KVMessageSerializer;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -139,16 +140,12 @@ public class AdditionalTest {
     }
 
     @Test
-    public void testMetaData() {
+    public void testMetadata() {
         ECSNode s1 = new ECSNode("s1", "ip", 0, "apple");
         ECSNode s2 = new ECSNode("s2", "ip", 0, "beta");
         ECSNode s3 = new ECSNode("s3", "ip", 0, "cat");
         ECSNode s4 = new ECSNode("s4", "ip", 0, "dog");
-        ArrayList<ECSNode> servers = new ArrayList<ECSNode>();
-        servers.add(s1);
-        servers.add(s2);
-        servers.add(s3);
-        servers.add(s4);
+        List<ECSNode> servers = Arrays.asList(s1, s2, s3, s4);
         Metadata metadata = new Metadata(servers);
         assertEquals(s1, metadata.getServer("eye"));
         assertEquals(s1, metadata.getServer("aa"));
@@ -160,10 +157,12 @@ public class AdditionalTest {
         assertEquals(s3, metadata.getServer("cat"));
         assertEquals(s4, metadata.getServer("dog"));
 
-        servers.clear();
+        servers = new ArrayList<>();
+        metadata = new Metadata(servers);
         assertNull(metadata.getServer("eye"));
 
-        servers.add(s1);
+        servers = Arrays.asList(s1);
+        metadata = new Metadata(servers);
         assertEquals(s1, metadata.getServer("eye"));
         assertEquals(s1, metadata.getServer("aa"));
         assertEquals(s1, metadata.getServer("bad"));
