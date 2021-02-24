@@ -18,6 +18,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -124,8 +125,13 @@ public class ECSController implements ZooKeeperListener {
         Runtime run = Runtime.getRuntime();
         try {
             proc = run.exec(script);
-            proc.waitFor();
-            int exitStatus = proc.exitValue();
+            proc.waitFor(500, TimeUnit.MILLISECONDS);
+            int exitStatus = 0;
+            try {
+                exitStatus = proc.exitValue();
+            } catch (Exception ignored) {
+                // Silence exception
+            }
             if (exitStatus != 0) {
                 String msg = String
                         .format("Failed to add node (name: %s, host: %s, port: %s), SSH call exited with non-zero status (%d)",
