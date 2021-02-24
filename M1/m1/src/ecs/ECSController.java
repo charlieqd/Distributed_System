@@ -67,6 +67,7 @@ public class ECSController implements ZooKeeperListener {
                          ZooKeeperService zooKeeperService) throws
             Exception {
         nodes = readConfig(configPath);
+        System.out.printf("%d servers found.\n", nodes.size());
         nodeStates = new HashMap<>();
         for (ECSNode node : nodes) {
             nodeStates.put(node.getNodeName(),
@@ -642,7 +643,6 @@ public class ECSController implements ZooKeeperListener {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.printf("%d servers found.%n", servers.size());
         return servers;
     }
 
