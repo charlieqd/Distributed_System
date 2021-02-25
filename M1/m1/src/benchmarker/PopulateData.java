@@ -18,7 +18,7 @@ public class PopulateData {
     private static KVStore kvStore;
     private static String host;
     private static int port;
-    private static ArrayList<String> keys = new ArrayList<>();
+    private static int count = 0;
 
     public static void setUp() throws IOException {
         kvStore = new KVStore(host, port);
@@ -39,21 +39,19 @@ public class PopulateData {
     public static void listFilesForFolder(final File folder) throws
             Exception {
         for (final File fileEntry : folder.listFiles()) {
+            if(count > 10000)
+                return;
             if (fileEntry.isDirectory()) {
                 listFilesForFolder(fileEntry);
             } else {
                 String filePath = fileEntry.getPath();
-                System.out.println(filePath);
-                String fileKey = filePath;
-                if(filePath.length() > 19){
-                    fileKey = filePath.substring(filePath.length() - 19);
-                }
-                keys.add(fileKey);
                 String content = readFile(filePath, StandardCharsets.UTF_8);
-                if(content.length() > 120000){
-                    content = content.substring(0,120000);
-                }
-                kvStore.put(fileKey, content);
+                content = content.substring(0,100);
+                System.out.println(count);
+                kvStore.put(Integer.toString(count), content);
+                count += 1;
+                if(count > 10000)
+                    return;
             }
         }
     }
@@ -68,18 +66,11 @@ public class PopulateData {
     public static void main(String[] args) throws Exception {
         new LogSetup("logs/populateData.log", Level.ERROR);
         String readingFilename = args[0];
-        String keyFileName = args[1];
-        host = args[2];
-        port = Integer.parseInt(args[3]);
+        host = args[1];
+        port = Integer.parseInt(args[2]);
         setUp();
         final File folder = new File(readingFilename);
         listFilesForFolder(folder);
-        System.out.println(keys.size());
-        FileWriter writer = new FileWriter(keyFileName);
-        for(String str: keys) {
-            writer.write(str + System.lineSeparator());
-        }
-        writer.close();
         tearDown();
     }
 
