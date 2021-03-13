@@ -83,23 +83,37 @@ public class Replicator extends Thread {
 
     private void incrementalReplication(KVStorageDelta delta,
                                         ServerConnection targetConnection) {
-        // shiftshift search files cmd+o: search for class
-        // loop through delta, connection push data
-        // pretend ecs to delete
         for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
             String key = entry.getKey();
             Value value = entry.getValue();
-            int id = -1;
+            int requestId = -1;
             try {
-                id = targetConnection.sendRequest(key, value.get(), KVMessage.StatusType.PUT);
-            } catch (IOException e) {
-                targetConnection.disconnect();
-                // throw error put failed
-            }
-            if (id == -1) {
-                // throw error
+                requestId = targetConnection.sendRequest(key, value.get(), KVMessage.StatusType.ECS_PUT);
+                if (requestId == -1) {
+                    logger.error(String.format(
+                            "Failed to replicate (key: %s) to target server",
+                            key));
+                }
+                try {
+                    KVMessage resMessage = targetConnection
+                            .receiveMessage(requestId);
+                    KVMessage.StatusType resStatus = resMessage.getStatus();
+                    if (resStatus == KVMessage.StatusType.PUT_SUCCESS ||
+                            resStatus == KVMessage.StatusType.PUT_UPDATE) {
+                        // Success
+                    } else {
+                        logger.error(
+                                "Failed to send data to next server: response status = " + resStatus
+                                        .toString());
+                    }
+                } catch (Exception e) {
+                    logger.error(
+                            "Failed to receive put response from target server");
+                }
+            } catch (Exception e) {
+                logger.error("Unable to incrementally replicate data");
             }
         }
-        throw new Error("Not implemented");
     }
+
 }
