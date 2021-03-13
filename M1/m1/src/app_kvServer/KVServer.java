@@ -52,6 +52,8 @@ public class KVServer extends Thread implements IKVServer {
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
 
+    private final Replicator replicator;
+
     /**
      * Start KV Server at given port
      *
@@ -70,6 +72,9 @@ public class KVServer extends Thread implements IKVServer {
         this.messageSerializer = messageSerializer;
         this.port = port;
         this.zooKeeperService = zooKeeperService;
+
+        this.replicator = new Replicator(this);
+        this.replicator.start();
     }
 
     /**
