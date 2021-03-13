@@ -1,6 +1,7 @@
 package testing;
 
 import server.IKVStorage;
+import server.KVStorageDelta;
 import shared.messages.KVMessage;
 
 import java.io.IOException;
@@ -41,6 +42,16 @@ public class FakeKVStorage implements IKVStorage {
     @Override
     public List<String> getAllKeys(String hashRangeStart,
                                    String hashRangeEnd) throws IOException {
+        throw new Error("Not implemented");
+    }
+
+    @Override
+    public Integer getCurrentDeltaLogicalTime() {
+        throw new Error("Not implemented");
+    }
+
+    @Override
+    public KVStorageDelta startNextDeltaRecording(int logicalTime) {
         throw new Error("Not implemented");
     }
 }

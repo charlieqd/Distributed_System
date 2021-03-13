@@ -32,6 +32,8 @@ public class KVStorage implements IKVStorage {
 
     private final Lock lock;
 
+    private KVStorageDelta delta = null;
+
     /**
      * @param rootPath
      * @param keyHashStrategy
@@ -97,6 +99,10 @@ public class KVStorage implements IKVStorage {
             KVMessage.StatusType response = fileStorage.write(key, value);
 
             cache.put(key, value == null ? NULL_VALUE : value);
+
+            if (delta != null) {
+                delta.put(key, value);
+            }
 
             return response;
         } finally {
@@ -164,5 +170,30 @@ public class KVStorage implements IKVStorage {
         }
     }
 
+    @Override
+    public Integer getCurrentDeltaLogicalTime() {
+        lock.lock();
+        try {
+            if (delta == null) {
+                return null;
+            } else {
+                return delta.getLogicalTime();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public KVStorageDelta startNextDeltaRecording(int logicalTime) {
+        lock.lock();
+        try {
+            KVStorageDelta lastDelta = delta;
+            delta = new KVStorageDelta(logicalTime);
+            return lastDelta;
+        } finally {
+            lock.unlock();
+        }
+    }
 
 }

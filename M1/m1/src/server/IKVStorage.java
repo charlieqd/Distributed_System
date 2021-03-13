@@ -17,4 +17,17 @@ public interface IKVStorage {
 
     List<String> getAllKeys(String hashRangeStart,
                             String hashRangeEnd) throws IOException;
+
+    /**
+     * @return The logical time of when the current delta started recording;
+     * null if no delta is currently being recorded.
+     */
+    Integer getCurrentDeltaLogicalTime();
+
+    /**
+     * Returns the currently recorded delta, and start the next recording given
+     * the current logical time. The next delta will have the given logical time
+     * (returned when the next getCurrentDeltaLogicalTime() is called).
+     */
+    KVStorageDelta startNextDeltaRecording(int logicalTime);
 }
