@@ -742,32 +742,33 @@ public class ECSController implements ZooKeeperListener {
             }
         }
 
-        boolean existProblemNode = removeProblemNode(children);
-        if (existProblemNode) {
+        int numProblemNode = removeProblemNode(children);
+        if (numProblemNode != 0) {
             Metadata newMetadata = computeMetadata();
             try {
                 updateActiveNodesMetadata(newMetadata);
             } catch (NodeCommandException e) {
                 logger.error("Unable to update metadata on all nodes");
             }
-            addNode(DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
+            addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
+                    DEFAULT_CACHE_SIZE);
         }
 
     }
 
-    private boolean removeProblemNode(List<String> children) {
+    private int removeProblemNode(List<String> children) {
         Set<String> cSet = new HashSet<String>(children);
-        boolean existProblemNode = false;
+        int numProblemNode = 0;
         for (String node : nodeStates.keySet()) {
             ECSNodeState state = getNodeState(node);
             if (state.getStatus()
                     .get() == ECSNodeState.Status.ACTIVATED && !cSet
                     .contains(node)) {
-                existProblemNode = true;
+                numProblemNode += 1;
                 state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
             }
         }
-        return existProblemNode;
+        return numProblemNode;
     }
 
     private List<String> getZooKeeperChildren(boolean watch) throws Exception {
