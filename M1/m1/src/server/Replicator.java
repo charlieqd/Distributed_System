@@ -2,7 +2,10 @@ package server;
 
 import app_kvServer.KVServer;
 import client.ServerConnection;
+import ecs.MoveDataArgs;
+import org.apache.log4j.Logger;
 import server.KVStorageDelta.Value;
+import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 
@@ -242,56 +245,85 @@ public class Replicator extends Thread {
         running.set(false);
     }
 
-    private void fullReplication(String rangeStart,
-                                 String rangeEnd,
-                                 ServerConnection targetConnection) {
-        try {
-            int requestId = targetConnection
-                    .sendRequest(new KVMessageImpl(null, null,
-                            null, KVMessage.StatusType.ECS_DELETE_DATA,
-                            new MoveDataArgs(rangeStart, rangeEnd, null, 0)));
+    private boolean fullReplication(String rangeStart,
+                                    String rangeEnd,
+                                    ServerConnection targetConnection) {
 
-            if (requestId == -1) {
-                logger.error("Unable to delete replicate data");
-                return false;
-            }
+        boolean success = deleteReplicateData(rangeStart, rangeEnd,
+                targetConnection))
+        success = success && copyDataTo(rangeStart,
+                rangeEnd, targetConnection);
+        return success;
 
-            try {
-                KVMessage resMessage = targetConnection
-                        .receiveMessage(requestId);
-                KVMessage.StatusType resStatus = resMessage.getStatus();
-                if (resStatus == KVMessage.StatusType.ECS_SUCCESS) {
-                    return true;
-                } else {
-                    logger.error(
-                            "Failed to send data to next server: response status = " + resStatus
-                                    .toString());
-                    return false;
-                }
-            } catch (Exception e) {
-                logger.error(
-                        "Failed to receive ecs delete response from target server");
-                return false;
-            }
-        } catch (Exception e) {
-            logger.error("Unable to delete replicate data");
-            return false;
-        }
-        deleteReplicateData(rangeStart, rangeEnd, targetConnection);
     }
 
     private boolean incrementalReplication(KVStorageDelta delta,
-                                        ServerConnection targetConnection) {
+                                           ServerConnection targetConnection) {
         for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
             String key = entry.getKey();
             Value value = entry.getValue();
-            Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(Arrays.asList(KVMessage.StatusType.PUT_UPDATE, KVMessage.StatusType.PUT_SUCCESS));
-            boolean result = sendCommandToNode(targetConnection, new KVMessageImpl(key, value.get(), KVMessage.StatusType.ECS_PUT), status_Set);
-            if(!result){
+            Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(
+                    Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
+                            KVMessage.StatusType.PUT_SUCCESS));
+            boolean result = sendCommandToNode(targetConnection,
+                    new KVMessageImpl(key, value.get(),
+                            KVMessage.StatusType.ECS_PUT), status_Set);
+            if (!result) {
                 logger.error("Incrementally Replication Failed");
                 return false;
             }
         }
+        return true;
+    }
+
+    private boolean deleteReplicateData(String rangeStart, String rangeEnd,
+                                        ServerConnection targetConnection) {
+        KVMessage msg = new KVMessageImpl(null, null,
+                null, KVMessage.StatusType.ECS_DELETE_DATA,
+                new MoveDataArgs(rangeStart, rangeEnd, null, 0));
+        return sendCommandToNode(targetConnection, msg,
+                new HashSet<KVMessage.StatusType>(
+                        Arrays.asList(KVMessage.StatusType.ECS_SUCCESS)));
+    }
+
+    public boolean copyDataTo(String hashRangeStart,
+                              String hashRangeEnd,
+                              ServerConnection targetConnection) {
+        List<String> keys = null;
+        try {
+            keys = storage.getAllKeys(hashRangeStart, hashRangeEnd);
+        } catch (IOException e) {
+            logger.error(e);
+            return false;
+        }
+
+
+        for (String key : keys) {
+            String value;
+            try {
+                value = storage.get(key);
+            } catch (IOException e) {
+                logger.error("Internal server error: " +
+                        Util.getStackTraceString(e));
+                return false;
+            }
+
+            KVMessage msg = new KVMessageImpl(key, value,
+                    KVMessage.StatusType.ECS_PUT);
+            boolean success = sendCommandToNode(targetConnection, msg,
+                    new HashSet<KVMessage.StatusType>(
+                            Arrays.asList(KVMessage.StatusType.PUT_SUCCESS,
+                                    KVMessage.StatusType.PUT_UPDATE)));
+            if (!success) {
+                logger.error(String.format(
+                        "Failed to send put request (key: %s) to target server",
+                        key));
+                return false;
+            }
+        }
+
+
+        logger.info("Successfully copy all data to target server.");
         return true;
     }
 
@@ -304,7 +336,8 @@ public class Replicator extends Thread {
 
             if (requestId == -1) {
                 logger.error(
-                        String.format("Unable to send message to node %s:%d",
+                        String.format(
+                                "Unable to send message to node %s:%d",
                                 targetConnection.getAddress(),
                                 targetConnection.getPort()));
                 return false;
