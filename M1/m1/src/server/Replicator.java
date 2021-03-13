@@ -4,6 +4,7 @@ import app_kvServer.KVServer;
 import client.ServerConnection;
 import ecs.MoveDataArgs;
 import org.apache.log4j.Logger;
+import server.KVStorageDelta.Value;
 import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
@@ -74,9 +75,23 @@ public class Replicator extends Thread {
 
     }
 
-    private void incrementalReplication(KVStorageDelta delta,
-                                        ServerConnection targetConnection) {
-        throw new Error("Not implemented");
+    private boolean incrementalReplication(KVStorageDelta delta,
+                                           ServerConnection targetConnection) {
+        for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
+            String key = entry.getKey();
+            Value value = entry.getValue();
+            Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(
+                    Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
+                            KVMessage.StatusType.PUT_SUCCESS));
+            boolean result = sendCommandToNode(targetConnection,
+                    new KVMessageImpl(key, value.get(),
+                            KVMessage.StatusType.ECS_PUT), status_Set);
+            if (!result) {
+                logger.error("Incrementally Replication Failed");
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean deleteReplicateData(String rangeStart, String rangeEnd,
@@ -125,9 +140,9 @@ public class Replicator extends Thread {
             }
         }
 
+
         logger.info("Successfully copy all data to target server.");
         return true;
-
     }
 
     private boolean sendCommandToNode(ServerConnection targetConnection,
@@ -139,7 +154,8 @@ public class Replicator extends Thread {
 
             if (requestId == -1) {
                 logger.error(
-                        String.format("Unable to send message to node %s:%d",
+                        String.format(
+                                "Unable to send message to node %s:%d",
                                 targetConnection.getAddress(),
                                 targetConnection.getPort()));
                 return false;
