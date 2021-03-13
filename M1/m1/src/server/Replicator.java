@@ -5,27 +5,12 @@ import client.ServerConnection;
 import ecs.MoveDataArgs;
 import org.apache.log4j.Logger;
 import server.KVStorageDelta.Value;
-import shared.Util;
+import shared.*;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
 
 import java.io.IOException;
 import java.util.*;
-
-import ecs.MoveDataArgs;
-import org.apache.log4j.Logger;
-import shared.ECSNode;
-import shared.IProtocol;
-import shared.ISerializer;
-import shared.Metadata;
-import shared.messages.KVMessage;
-import shared.messages.KVMessage;
-import shared.messages.KVMessageImpl;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -250,7 +235,7 @@ public class Replicator extends Thread {
                                     ServerConnection targetConnection) {
 
         boolean success = deleteReplicateData(rangeStart, rangeEnd,
-                targetConnection))
+                targetConnection);
         success = success && copyDataTo(rangeStart,
                 rangeEnd, targetConnection);
         return success;
