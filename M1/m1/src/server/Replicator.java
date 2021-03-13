@@ -104,7 +104,7 @@ public class Replicator extends Thread {
         deleteReplicateData(rangeStart, rangeEnd, targetConnection);
     }
 
-    private void incrementalReplication(KVStorageDelta delta,
+    private boolean incrementalReplication(KVStorageDelta delta,
                                         ServerConnection targetConnection) {
         for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
             String key = entry.getKey();
@@ -112,9 +112,10 @@ public class Replicator extends Thread {
             Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(Arrays.asList(KVMessage.StatusType.PUT_UPDATE, KVMessage.StatusType.PUT_SUCCESS));
             boolean result = sendCommandToNode(targetConnection, new KVMessageImpl(key, value.get(), KVMessage.StatusType.ECS_PUT), status_Set);
             if(!result){
-                logger.error("Incrementally Replication Failed");
+                return false;
             }
         }
+        return true;
     }
 
     private boolean sendCommandToNode(ServerConnection targetConnection,
