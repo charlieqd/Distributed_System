@@ -40,6 +40,15 @@ public class Metadata implements Serializable {
         return binarySearch(ringPosition);
     }
 
+    public ECSNode getServerByName(String name) {
+        for (ECSNode node : servers) {
+            if (node.getNodeName().equals(name)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
     public ECSNode getPredecessor(ECSNode node) {
         if (servers.size() == 0) {
             return null;
@@ -60,7 +69,7 @@ public class Metadata implements Serializable {
         return servers.get(index - 1);
     }
 
-    public ECSNode getSuccessor(ECSNode node){
+    public ECSNode getSuccessor(ECSNode node) {
         if (servers.size() == 0) {
             return null;
         }

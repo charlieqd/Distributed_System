@@ -73,7 +73,8 @@ public class KVServer extends Thread implements IKVServer {
         this.port = port;
         this.zooKeeperService = zooKeeperService;
 
-        this.replicator = new Replicator(this);
+        this.replicator = new Replicator(protocol, messageSerializer, this,
+                storage);
         this.replicator.start();
     }
 
@@ -158,6 +159,8 @@ public class KVServer extends Thread implements IKVServer {
      */
     private void stopServer() {
         if (!running.get()) return;
+
+        replicator.shutdown();
 
         running.set(false);
         try {
