@@ -21,8 +21,7 @@ public class ECSClient {
 
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECS Client> ";
-    private static final String DEFAULT_CACHE_STRATEGY = "LRU";
-    private static final int DEFAULT_CACHE_SIZE = 8192;
+    
     private final InputStream input;
     private BufferedReader stdin;
     private boolean stop = false;
@@ -89,8 +88,9 @@ public class ECSClient {
                 try {
                     int nodesNum = Integer.parseInt(tokens[1]);
                     nodes = controller
-                            .addNodes(nodesNum, DEFAULT_CACHE_STRATEGY,
-                                    DEFAULT_CACHE_SIZE);
+                            .addNodes(nodesNum,
+                                    ECSController.DEFAULT_CACHE_STRATEGY,
+                                    ECSController.DEFAULT_CACHE_SIZE);
                 } catch (NumberFormatException e) {
                     printError("Invalid integer");
                 }
@@ -137,7 +137,8 @@ public class ECSClient {
             if (tokens.length == 1) {
                 System.out.println("Adding node...");
                 node = controller
-                        .addNode(DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
+                        .addNode(ECSController.DEFAULT_CACHE_STRATEGY,
+                                ECSController.DEFAULT_CACHE_SIZE);
             } else if (tokens.length == 3) {
                 System.out.println("Adding node...");
                 try {
