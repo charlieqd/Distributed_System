@@ -216,6 +216,30 @@ public class AdditionalTest {
     }
 
     @Test
+    public void testMetadataGetSuccessor() {
+        ECSNode s1 = new ECSNode("s1", "ip", 0, "apple");
+        ECSNode s2 = new ECSNode("s2", "ip", 0, "beta");
+        ECSNode s3 = new ECSNode("s3", "ip", 0, "cat");
+        ECSNode s4 = new ECSNode("s4", "ip", 0, "dog");
+        ECSNode s5 = new ECSNode("s5", "ip", 0, "hi");
+        List<ECSNode> servers = Arrays.asList(s2, s1, s4, s3);
+        Metadata metadata = new Metadata(servers);
+
+        assertEquals(s2, metadata.getSuccessor(s1));
+        assertEquals(s3, metadata.getSuccessor(s2));
+        assertEquals(s4, metadata.getSuccessor(s3));
+        assertEquals(s1, metadata.getSuccessor(s4));
+        assertNull(metadata.getSuccessor(s5));
+
+        metadata = new Metadata(new ArrayList<>());
+        assertNull(metadata.getSuccessor(s5));
+
+        servers = Arrays.asList(s1);
+        metadata = new Metadata(servers);
+        assertEquals(s1, metadata.getSuccessor(s1));
+    }
+
+    @Test
     public void testECSReadConfig() throws IOException {
         File configFile = folder.newFile("testecs.config");
         try (BufferedWriter bw = new BufferedWriter(
