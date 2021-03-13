@@ -2,6 +2,9 @@ package server;
 
 import app_kvServer.KVServer;
 import client.ServerConnection;
+import ecs.MoveDataArgs;
+import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -38,7 +41,18 @@ public class Replicator extends Thread {
     private void fullReplication(String rangeStart,
                                  String rangeEnd,
                                  ServerConnection targetConnection) {
-        throw new Error("Not implemented");
+        try {
+            int request_id = targetConnection
+                    .sendRequest(new KVMessageImpl(null, null,
+                            null, KVMessage.StatusType.ECS_DELETE_DATA,
+                            new MoveDataArgs(rangeStart, rangeEnd, null, 0)));
+
+        } catch (Exception e) {
+            logger.error(String.format(
+                    "Failed to send put request (key: %s) to target server",
+                    key));
+            return false;
+        }
     }
 
     private void incrementalReplication(KVStorageDelta delta,
