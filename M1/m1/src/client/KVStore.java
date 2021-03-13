@@ -158,10 +158,10 @@ public class KVStore implements KVCommInterface {
                 }
             } else {
                 if (connections.isEmpty()) return null;
-                Map.Entry<String, ServerConnection> entry =
-                        connections.entrySet().iterator().next();
-                ringPosition = entry.getKey();
-                connection = entry.getValue();
+                // then connect with the replica
+                ECSNode nodeInvalid = cachedMetadata.getServer(ringPosition);
+                ringPosition = cachedMetadata.getSuccessor(nodeInvalid).getPosition();
+                connection = connections.get(ringPosition);
             }
         }
     }

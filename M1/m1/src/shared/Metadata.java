@@ -60,6 +60,26 @@ public class Metadata implements Serializable {
         return servers.get(index - 1);
     }
 
+    public ECSNode getSuccessor(ECSNode node){
+        if (servers.size() == 0) {
+            return null;
+        }
+        int index = -1;
+        for (int i = 0; i < servers.size(); ++i) {
+            if (servers.get(i) == node) {
+                index = i;
+                break;
+            }
+        }
+        if (index == -1) {
+            return null;
+        }
+        if (index == servers.size() - 1) {
+            return servers.get(0);
+        }
+        return servers.get(index + 1);
+    }
+
     public ECSNode binarySearch(String ringPosition) {
         int left = 0;
         int right = servers.size() - 1;

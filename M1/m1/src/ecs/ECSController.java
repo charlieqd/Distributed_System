@@ -20,6 +20,8 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * NOTE: This class it not thread-safe.
@@ -55,11 +57,17 @@ public class ECSController implements ZooKeeperListener {
     // The server might need to delete data
     public static final int SHUTDOWN_COMMAND_TIMEOUT_SECONDS = 60;
 
+    public static final String DEFAULT_CACHE_STRATEGY = "LRU";
+
+    public static final int DEFAULT_CACHE_SIZE = 8192;
+
     private static Logger logger = Logger.getRootLogger();
 
     private ArrayList<ECSNode> nodes;
     private ZooKeeperService zooKeeperService;
     private Map<String, ECSNodeState> nodeStates;
+
+    private final Lock lock;
 
     public ECSController(IProtocol protocol,
                          ISerializer<KVMessage> serializer,
@@ -92,394 +100,442 @@ public class ECSController implements ZooKeeperListener {
             logger.error("Failed to watch ZooKeeper node", e);
             throw e;
         }
+
+        lock = new ReentrantLock();
     }
 
     public ECSNode addNode(String cacheStrategy, int cacheSize) {
-        List<ECSNode> availableToAdd = getNodesWithStatus(
-                ECSNodeState.Status.NOT_LAUNCHED);
-        if (availableToAdd.isEmpty()) {
-            String msg = "No available nodes to add.";
-            logger.error(msg);
-            return null;
-        }
-
-        int randomNum = ThreadLocalRandom.current()
-                .nextInt(0, availableToAdd.size());
-        ECSNode node = availableToAdd.get(randomNum);
-        ECSNodeState state = getNodeState(node);
-        state.getStatus().set(ECSNodeState.Status.LAUNCHING);
-
-        // Launch node
-
-        Process proc;
-        String[] script = {
-                "bash",
-                "invoke_server.sh",
-                node.getNodeHost(),
-                String.format("%d", node.getNodePort()),
-                cacheStrategy,
-                String.format("%d", cacheSize),
-                zooKeeperService.getURL(),
-                node.getNodeName()
-        };
-
-        Runtime run = Runtime.getRuntime();
+        lock.lock();
         try {
-            proc = run.exec(script);
-            proc.waitFor(500, TimeUnit.MILLISECONDS);
-            int exitStatus = 0;
-            try {
-                exitStatus = proc.exitValue();
-            } catch (Exception ignored) {
-                // Silence exception
-            }
-            if (exitStatus != 0) {
-                String msg = String
-                        .format("Failed to add node (name: %s, host: %s, port: %s), SSH call exited with non-zero status (%d)",
-                                node.getNodeName(), node.getNodeHost(),
-                                node.getNodePort(), exitStatus);
+            List<ECSNode> availableToAdd = getNodesWithStatus(
+                    ECSNodeState.Status.NOT_LAUNCHED);
+            if (availableToAdd.isEmpty()) {
+                String msg = "No available nodes to add.";
                 logger.error(msg);
+                return null;
+            }
+
+            int randomNum = ThreadLocalRandom.current()
+                    .nextInt(0, availableToAdd.size());
+            ECSNode node = availableToAdd.get(randomNum);
+            ECSNodeState state = getNodeState(node);
+            state.getStatus().set(ECSNodeState.Status.LAUNCHING);
+
+            // Launch node
+
+            Process proc;
+            String[] script = {
+                    "bash",
+                    "invoke_server.sh",
+                    node.getNodeHost(),
+                    String.format("%d", node.getNodePort()),
+                    cacheStrategy,
+                    String.format("%d", cacheSize),
+                    zooKeeperService.getURL(),
+                    node.getNodeName()
+            };
+
+            Runtime run = Runtime.getRuntime();
+            try {
+                proc = run.exec(script);
+                proc.waitFor(500, TimeUnit.MILLISECONDS);
+                int exitStatus = 0;
+                try {
+                    exitStatus = proc.exitValue();
+                } catch (Exception ignored) {
+                    // Silence exception
+                }
+                if (exitStatus != 0) {
+                    String msg = String
+                            .format("Failed to add node (name: %s, host: %s, port: %s), SSH call exited with non-zero status (%d)",
+                                    node.getNodeName(), node.getNodeHost(),
+                                    node.getNodePort(), exitStatus);
+                    logger.error(msg);
+                    state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+                    return null;
+                }
+            } catch (IOException | InterruptedException e) {
+                String msg = String
+                        .format("Failed to add node, name: %s, host: %s, port: %s",
+                                node.getNodeName(), node.getNodeHost(),
+                                node.getNodePort());
+                logger.error(msg, e);
                 state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
                 return null;
             }
-        } catch (IOException | InterruptedException e) {
-            String msg = String
-                    .format("Failed to add node, name: %s, host: %s, port: %s",
-                            node.getNodeName(), node.getNodeHost(),
-                            node.getNodePort());
-            logger.error(msg, e);
-            state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
-            return null;
-        }
 
-        logger.info(
-                String.format("Launching node: %s %s:%d", node.getNodeName(),
-                        node.getNodeHost(), node.getNodePort()));
+            logger.info(
+                    String.format("Launching node: %s %s:%d",
+                            node.getNodeName(),
+                            node.getNodeHost(), node.getNodePort()));
 
-        // Wait for node launch
+            // Wait for node launch
 
-        try {
-            getZooKeeperChildren(true);
-        } catch (Exception e) {
-            logger.error("Failed to watch ZooKeeper node", e);
-        }
-
-        long startMs = System.currentTimeMillis();
-        while (state.getStatus().get() != ECSNodeState.Status.LAUNCHED &&
-                System.currentTimeMillis() - startMs < LAUNCH_TIMEOUT_MS) {
             try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                getZooKeeperChildren(true);
+            } catch (Exception e) {
+                logger.error("Failed to watch ZooKeeper node", e);
             }
-        }
 
-        if (state.getStatus().get() != ECSNodeState.Status.LAUNCHED) {
-            // Timeout
-            logger.error(String.format(
-                    "Failed to launch ZooKeeper node %s: launch not detected before timeout",
+            long startMs = System.currentTimeMillis();
+            while (state.getStatus().get() != ECSNodeState.Status.LAUNCHED &&
+                    System.currentTimeMillis() - startMs < LAUNCH_TIMEOUT_MS) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (state.getStatus().get() != ECSNodeState.Status.LAUNCHED) {
+                // Timeout
+                logger.error(String.format(
+                        "Failed to launch ZooKeeper node %s: launch not detected before timeout",
+                        node.getNodeName()));
+                state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+                return null;
+            }
+
+            // Connect to node
+
+            logger.info(String.format("Connecting to node %s",
                     node.getNodeName()));
-            state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
-            return null;
-        }
 
-        // Connect to node
-
-        logger.info(String.format("Connecting to node %s",
-                node.getNodeName()));
-
-        try {
-            state.getConnection().connect();
-        } catch (Exception e) {
-            logger.error(String.format("Failed to connect to node %s",
-                    node.getNodeName()));
-            state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
-            return null;
-        }
-
-        logger.info(String.format("Connected to node %s",
-                node.getNodeName()));
-
-        state.getStatus().set(ECSNodeState.Status.CONNECTED);
-
-        Metadata currentMetadata = computeMetadata();
-
-        ECSNode successorNode = currentMetadata.getServer(node.getPosition());
-
-        // Perform data transfer
-
-        String rangeStart = null;
-        String rangeEnd = null;
-
-        if (successorNode != null) {
             try {
-                logger.info("Transferring data");
+                state.getConnection().connect();
+            } catch (Exception e) {
+                logger.error(String.format("Failed to connect to node %s",
+                        node.getNodeName()));
+                state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+                return null;
+            }
 
-                // Set write lock
+            logger.info(String.format("Connected to node %s",
+                    node.getNodeName()));
 
-                sendCommandToNode(new KVMessageImpl(null, null,
-                        KVMessage.StatusType.ECS_LOCK_WRITE), successorNode);
+            state.getStatus().set(ECSNodeState.Status.CONNECTED);
 
-                ECSNode predecessor = currentMetadata
-                        .getPredecessor(successorNode);
+            Metadata currentMetadata = computeMetadata();
 
-                rangeStart = predecessor.getPosition();
-                rangeEnd = node.getPosition();
+            ECSNode successorNode = currentMetadata
+                    .getServer(node.getPosition());
 
-                sendCommandToNode(new KVMessageImpl(null, null,
-                                null, KVMessage.StatusType.ECS_COPY_DATA,
-                                new MoveDataArgs(rangeStart, rangeEnd,
-                                        node.getNodeHost(), node.getNodePort())),
-                        successorNode, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
+            // Perform data transfer
 
+            String rangeStart = null;
+            String rangeEnd = null;
+
+            if (successorNode != null) {
+                try {
+                    logger.info("Transferring data");
+
+                    // Set write lock
+
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    KVMessage.StatusType.ECS_LOCK_WRITE),
+                            successorNode);
+
+                    ECSNode predecessor = currentMetadata
+                            .getPredecessor(successorNode);
+
+                    rangeStart = predecessor.getPosition();
+                    rangeEnd = node.getPosition();
+
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    null, KVMessage.StatusType.ECS_COPY_DATA,
+                                    new MoveDataArgs(rangeStart, rangeEnd,
+                                            node.getNodeHost(), node.getNodePort())),
+                            successorNode, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
+
+                } catch (NodeCommandException e) {
+                    logger.error(
+                            "Unable to transfer data. Shutting down new node");
+                    try {
+                        sendCommandToNode(new KVMessageImpl(null, null,
+                                        KVMessage.StatusType.ECS_UNLOCK_WRITE),
+                                successorNode);
+                    } catch (NodeCommandException nce) {
+                        logger.error("Unable to release write lock");
+                    }
+                    try {
+                        sendCommandToNode(new KVMessageImpl(null, null,
+                                        KVMessage.StatusType.ECS_SHUTDOWN), node,
+                                SHUTDOWN_COMMAND_TIMEOUT_SECONDS);
+                    } catch (NodeCommandException nce) {
+                        logger.error("Unable to shut down new node");
+                    }
+                    state.getConnection().disconnect(true);
+                    state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+                    return null;
+                }
+            }
+
+            // Update metadata on all nodes
+
+            logger.info("Updating metadata of all nodes");
+
+            state.getStatus().set(ECSNodeState.Status.ACTIVATED);
+
+            // This metadata will include the newly activated server
+            Metadata newMetadata = computeMetadata();
+
+            try {
+                updateActiveNodesMetadata(newMetadata);
             } catch (NodeCommandException e) {
-                logger.error("Unable to transfer data. Shutting down new node");
+                logger.error("Unable to update metadata on all nodes");
+                return null;
+            }
+
+            // Release write lock and delete transferred data
+
+            if (successorNode != null) {
                 try {
                     sendCommandToNode(new KVMessageImpl(null, null,
                                     KVMessage.StatusType.ECS_UNLOCK_WRITE),
                             successorNode);
-                } catch (NodeCommandException nce) {
+                } catch (NodeCommandException e) {
                     logger.error("Unable to release write lock");
+                    return null;
                 }
+
                 try {
                     sendCommandToNode(new KVMessageImpl(null, null,
-                                    KVMessage.StatusType.ECS_SHUTDOWN), node,
-                            SHUTDOWN_COMMAND_TIMEOUT_SECONDS);
-                } catch (NodeCommandException nce) {
-                    logger.error("Unable to shut down new node");
+                                    null, KVMessage.StatusType.ECS_DELETE_DATA,
+                                    new MoveDataArgs(rangeStart, rangeEnd, null, 0)),
+                            successorNode, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
+                } catch (NodeCommandException e) {
+                    logger.error("Unable to delete transferred data");
+                    return null;
                 }
-                state.getConnection().disconnect(true);
-                state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
-                return null;
-            }
-        }
-
-        // Update metadata on all nodes
-
-        logger.info("Updating metadata of all nodes");
-
-        state.getStatus().set(ECSNodeState.Status.ACTIVATED);
-
-        // This metadata will include the newly activated server
-        Metadata newMetadata = computeMetadata();
-
-        try {
-            updateActiveNodesMetadata(newMetadata);
-        } catch (NodeCommandException e) {
-            logger.error("Unable to update metadata on all nodes");
-            return null;
-        }
-
-        // Release write lock and delete transferred data
-
-        if (successorNode != null) {
-            try {
-                sendCommandToNode(new KVMessageImpl(null, null,
-                        KVMessage.StatusType.ECS_UNLOCK_WRITE), successorNode);
-            } catch (NodeCommandException e) {
-                logger.error("Unable to release write lock");
-                return null;
             }
 
-            try {
-                sendCommandToNode(new KVMessageImpl(null, null,
-                                null, KVMessage.StatusType.ECS_DELETE_DATA,
-                                new MoveDataArgs(rangeStart, rangeEnd, null, 0)),
-                        successorNode, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
-            } catch (NodeCommandException e) {
-                logger.error("Unable to delete transferred data");
-                return null;
-            }
+            logger.info(String.format("Successfully added node %s",
+                    node.getNodeName()));
+
+            return node;
+        } finally {
+            lock.unlock();
         }
-
-        logger.info(String.format("Successfully added node %s",
-                node.getNodeName()));
-
-        return node;
     }
 
     public boolean removeNode(String nodeName) {
-        ECSNodeState state = getNodeState(nodeName);
-        if (state == null) {
-            logger.error("Node not found: " + nodeName);
-            return false;
-        }
-
-        if (state.getStatus().get() != ECSNodeState.Status.ACTIVATED) {
-            logger.error("Node not active: " + nodeName);
-            return false;
-        }
-
-        ECSNode node = state.getNode();
-
-        // Remove from list of active servers
-        state.getStatus().set(ECSNodeState.Status.CONNECTED);
-
-        Metadata newMetadata = computeMetadata();
-
-        ECSNode successorNode = newMetadata.getServer(node.getPosition());
-
-        // Perform data transfer
-
-        if (successorNode != null) {
-            try {
-                logger.info("Transferring data");
-
-                // Set write lock
-
-                sendCommandToNode(new KVMessageImpl(null, null,
-                        KVMessage.StatusType.ECS_LOCK_WRITE), node);
-
-                ECSNode predecessor = newMetadata.getPredecessor(successorNode);
-
-                String rangeStart = predecessor.getPosition();
-                String rangeEnd = node.getPosition();
-
-                sendCommandToNode(new KVMessageImpl(null, null, null,
-                                KVMessage.StatusType.ECS_COPY_DATA,
-                                new MoveDataArgs(rangeStart, rangeEnd,
-                                        successorNode.getNodeHost(),
-                                        successorNode.getNodePort())),
-                        node, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
-
-            } catch (NodeCommandException e) {
-                logger.error("Unable to transfer data. Aborting removal.");
-                try {
-                    sendCommandToNode(new KVMessageImpl(null, null,
-                            KVMessage.StatusType.ECS_UNLOCK_WRITE), node);
-                } catch (NodeCommandException nce) {
-                    logger.error("Unable to release write lock");
-                }
-                state.getStatus().set(ECSNodeState.Status.ACTIVATED);
+        lock.lock();
+        try {
+            ECSNodeState state = getNodeState(nodeName);
+            if (state == null) {
+                logger.error("Node not found: " + nodeName);
                 return false;
             }
-        } else {
-            logger.warn("Warning: The only active server is being removed.");
+
+            if (state.getStatus().get() != ECSNodeState.Status.ACTIVATED) {
+                logger.error("Node not active: " + nodeName);
+                return false;
+            }
+
+            ECSNode node = state.getNode();
+
+            // Remove from list of active servers
+            state.getStatus().set(ECSNodeState.Status.CONNECTED);
+
+            Metadata newMetadata = computeMetadata();
+
+            ECSNode successorNode = newMetadata.getServer(node.getPosition());
+
+            // Perform data transfer
+
+            if (successorNode != null) {
+                try {
+                    logger.info("Transferring data");
+
+                    // Set write lock
+
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_LOCK_WRITE), node);
+
+                    ECSNode predecessor = newMetadata
+                            .getPredecessor(successorNode);
+
+                    String rangeStart = predecessor.getPosition();
+                    String rangeEnd = node.getPosition();
+
+                    sendCommandToNode(new KVMessageImpl(null, null, null,
+                                    KVMessage.StatusType.ECS_COPY_DATA,
+                                    new MoveDataArgs(rangeStart, rangeEnd,
+                                            successorNode.getNodeHost(),
+                                            successorNode.getNodePort())),
+                            node, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
+
+                } catch (NodeCommandException e) {
+                    logger.error("Unable to transfer data. Aborting removal.");
+                    try {
+                        sendCommandToNode(new KVMessageImpl(null, null,
+                                KVMessage.StatusType.ECS_UNLOCK_WRITE), node);
+                    } catch (NodeCommandException nce) {
+                        logger.error("Unable to release write lock");
+                    }
+                    state.getStatus().set(ECSNodeState.Status.ACTIVATED);
+                    return false;
+                }
+            } else {
+                logger.warn(
+                        "Warning: The only active server is being removed.");
+            }
+
+            // Shutdown the server to be removed
+
+            boolean success = true;
+
+            logger.info("Shutting down removed node");
+
+            try {
+                sendCommandToNode(new KVMessageImpl(null, null,
+                                KVMessage.StatusType.ECS_SHUTDOWN), node,
+                        SHUTDOWN_COMMAND_TIMEOUT_SECONDS);
+            } catch (NodeCommandException e) {
+                logger.error("Unable to shut down removed node");
+                success = false;
+            }
+
+            state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+
+            state.getConnection().disconnect(true);
+
+            // Remove the corresponding znode
+
+            try {
+                zooKeeperService.removeNode(
+                        String.format("%s/%s", ECSController.ZOO_KEEPER_ROOT,
+                                node.getNodeName()));
+            } catch (Exception e) {
+                logger.error("Unable to remove znode", e);
+                success = false;
+            }
+
+            // Update metadata on all nodes
+
+            logger.info("Updating metadata of all nodes");
+
+            try {
+                updateActiveNodesMetadata(newMetadata);
+            } catch (NodeCommandException e) {
+                logger.error("Unable to update metadata on all nodes");
+                success = false;
+            }
+
+            if (success) {
+                logger.info(String.format("Successfully removed node %s",
+                        node.getNodeName()));
+            }
+
+            return success;
+        } finally {
+            lock.unlock();
         }
-
-        // Shutdown the server to be removed
-
-        boolean success = true;
-
-        logger.info("Shutting down removed node");
-
-        try {
-            sendCommandToNode(new KVMessageImpl(null, null,
-                            KVMessage.StatusType.ECS_SHUTDOWN), node,
-                    SHUTDOWN_COMMAND_TIMEOUT_SECONDS);
-        } catch (NodeCommandException e) {
-            logger.error("Unable to shut down removed node");
-            success = false;
-        }
-
-        state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
-
-        state.getConnection().disconnect(true);
-
-        // Remove the corresponding znode
-
-        try {
-            zooKeeperService.removeNode(
-                    String.format("%s/%s", ECSController.ZOO_KEEPER_ROOT,
-                            node.getNodeName()));
-        } catch (Exception e) {
-            logger.error("Unable to remove znode", e);
-            success = false;
-        }
-
-        // Update metadata on all nodes
-
-        logger.info("Updating metadata of all nodes");
-
-        try {
-            updateActiveNodesMetadata(newMetadata);
-        } catch (NodeCommandException e) {
-            logger.error("Unable to update metadata on all nodes");
-            success = false;
-        }
-
-        if (success) {
-            logger.info(String.format("Successfully removed node %s",
-                    node.getNodeName()));
-        }
-
-        return success;
     }
 
     public List<ECSNode> addNodes(int count, String cacheStrategy,
                                   int cacheSize) {
-        List<ECSNode> availableToAdd = getNodesWithStatus(
-                ECSNodeState.Status.NOT_LAUNCHED);
+        lock.lock();
+        try {
+            List<ECSNode> availableToAdd = getNodesWithStatus(
+                    ECSNodeState.Status.NOT_LAUNCHED);
 
-        if (availableToAdd.size() < count) {
-            String msg = String
-                    .format("Not enough available nodes to add. Number of available node: %s",
-                            availableToAdd.size());
-            logger.error(msg);
-            return new ArrayList<>();
-        }
-
-        List<ECSNode> result = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            ECSNode node = addNode(cacheStrategy, cacheSize);
-            if (node != null) {
-                result.add(node);
+            if (availableToAdd.size() < count) {
+                String msg = String
+                        .format("Not enough available nodes to add. Number of available node: %s",
+                                availableToAdd.size());
+                logger.error(msg);
+                return new ArrayList<>();
             }
+
+            List<ECSNode> result = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                ECSNode node = addNode(cacheStrategy, cacheSize);
+                if (node != null) {
+                    result.add(node);
+                }
+            }
+            return result;
+        } finally {
+            lock.unlock();
         }
-        return result;
     }
 
     public void start() throws NodeCommandException {
-        List<ECSNode> nodes = getNodesWithStatus(ECSNodeState.Status.ACTIVATED);
-        sendCommandToNodes(new KVMessageImpl(null, null, null,
-                KVMessage.StatusType.ECS_START_SERVING), nodes);
+        lock.lock();
+        try {
+            List<ECSNode> nodes = getNodesWithStatus(
+                    ECSNodeState.Status.ACTIVATED);
+            sendCommandToNodes(new KVMessageImpl(null, null, null,
+                    KVMessage.StatusType.ECS_START_SERVING), nodes);
+        } finally {
+            lock.unlock();
+        }
     }
 
     public void stop() throws NodeCommandException {
-        List<ECSNode> nodes = getNodesWithStatus(ECSNodeState.Status.ACTIVATED);
-        sendCommandToNodes(new KVMessageImpl(null, null, null,
-                KVMessage.StatusType.ECS_STOP_SERVING), nodes);
+        lock.lock();
+        try {
+            List<ECSNode> nodes = getNodesWithStatus(
+                    ECSNodeState.Status.ACTIVATED);
+            sendCommandToNodes(new KVMessageImpl(null, null, null,
+                    KVMessage.StatusType.ECS_STOP_SERVING), nodes);
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
      * NOTE: Do not use ECSController after calling this method.
      */
     public void shutdownAllNodes() {
-        List<ECSNode> nodes = getNodesWithStatus(ECSNodeState.Status.LAUNCHED,
-                ECSNodeState.Status.CONNECTED, ECSNodeState.Status.ACTIVATED);
+        lock.lock();
         try {
-            sendCommandToNodes(new KVMessageImpl(null, null, null,
-                            KVMessage.StatusType.ECS_SHUTDOWN), nodes,
-                    SHUTDOWN_COMMAND_TIMEOUT_SECONDS);
-        } catch (NodeCommandException e) {
-            logger.error("Unable to shutdown all servers");
-        }
-        for (ECSNode node : nodes) {
-            ECSNodeState state = getNodeState(node);
-            state.getConnection().disconnect(true);
-            state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+            List<ECSNode> nodes = getNodesWithStatus(
+                    ECSNodeState.Status.LAUNCHED,
+                    ECSNodeState.Status.CONNECTED,
+                    ECSNodeState.Status.ACTIVATED);
+            try {
+                sendCommandToNodes(new KVMessageImpl(null, null, null,
+                                KVMessage.StatusType.ECS_SHUTDOWN), nodes,
+                        SHUTDOWN_COMMAND_TIMEOUT_SECONDS);
+            } catch (NodeCommandException e) {
+                logger.error("Unable to shutdown all servers");
+            }
+            for (ECSNode node : nodes) {
+                ECSNodeState state = getNodeState(node);
+                state.getConnection().disconnect(true);
+                state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
     public void printServerStatuses() {
-        List<ECSNode> activeNodes = new ArrayList<>();
-        List<ECSNode> inactiveNodes = new ArrayList<>();
-        for (ECSNode node : nodes) {
-            if (getNodeState(node).getStatus()
-                    .get() == ECSNodeState.Status.ACTIVATED) {
-                activeNodes.add(node);
-            } else {
-                inactiveNodes.add(node);
+        lock.lock();
+        try {
+            List<ECSNode> activeNodes = new ArrayList<>();
+            List<ECSNode> inactiveNodes = new ArrayList<>();
+            for (ECSNode node : nodes) {
+                if (getNodeState(node).getStatus()
+                        .get() == ECSNodeState.Status.ACTIVATED) {
+                    activeNodes.add(node);
+                } else {
+                    inactiveNodes.add(node);
+                }
             }
-        }
-        System.out.println("Active nodes:");
-        for (ECSNode node : activeNodes) {
-            printNode(node);
-        }
-        System.out.println("");
-        System.out.println("Inactive nodes:");
-        for (ECSNode node : inactiveNodes) {
-            printNode(node);
+            System.out.println("Active nodes:");
+            for (ECSNode node : activeNodes) {
+                printNode(node);
+            }
+            System.out.println("");
+            System.out.println("Inactive nodes:");
+            for (ECSNode node : inactiveNodes) {
+                printNode(node);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -648,12 +704,18 @@ public class ECSController implements ZooKeeperListener {
 
     @Override
     public void handleZooKeeperEvent(WatchedEvent event) {
-        if (event.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
-            try {
-                onZooKeeperChildrenChanged(getZooKeeperChildren(true));
-            } catch (Exception e) {
-                logger.error("Failed to watch ZooKeeper node", e);
+        lock.lock();
+        try {
+            if (event
+                    .getType() == Watcher.Event.EventType.NodeChildrenChanged) {
+                try {
+                    onZooKeeperChildrenChanged(getZooKeeperChildren(true));
+                } catch (Exception e) {
+                    logger.error("Failed to watch ZooKeeper node", e);
+                }
             }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -679,6 +741,34 @@ public class ECSController implements ZooKeeperListener {
                                 nodeName));
             }
         }
+
+        int numProblemNode = removeProblemNode(children);
+        if (numProblemNode != 0) {
+            Metadata newMetadata = computeMetadata();
+            try {
+                updateActiveNodesMetadata(newMetadata);
+            } catch (NodeCommandException e) {
+                logger.error("Unable to update metadata on all nodes");
+            }
+            addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
+                    DEFAULT_CACHE_SIZE);
+        }
+
+    }
+
+    private int removeProblemNode(List<String> children) {
+        Set<String> cSet = new HashSet<String>(children);
+        int numProblemNode = 0;
+        for (String node : nodeStates.keySet()) {
+            ECSNodeState state = getNodeState(node);
+            if (state.getStatus()
+                    .get() == ECSNodeState.Status.ACTIVATED && !cSet
+                    .contains(node)) {
+                numProblemNode += 1;
+                state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
+            }
+        }
+        return numProblemNode;
     }
 
     private List<String> getZooKeeperChildren(boolean watch) throws Exception {
