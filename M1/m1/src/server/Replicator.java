@@ -2,12 +2,22 @@ package server;
 
 import app_kvServer.KVServer;
 import client.ServerConnection;
+import server.KVStorageDelta.Value;
+import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
+
+import java.io.IOException;
+import java.util.*;
+
+import ecs.MoveDataArgs;
 import org.apache.log4j.Logger;
 import shared.ECSNode;
 import shared.IProtocol;
 import shared.ISerializer;
 import shared.Metadata;
 import shared.messages.KVMessage;
+import shared.messages.KVMessage;
+import shared.messages.KVMessageImpl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -235,11 +245,98 @@ public class Replicator extends Thread {
     private void fullReplication(String rangeStart,
                                  String rangeEnd,
                                  ServerConnection targetConnection) {
-        throw new Error("Not implemented");
+        try {
+            int requestId = targetConnection
+                    .sendRequest(new KVMessageImpl(null, null,
+                            null, KVMessage.StatusType.ECS_DELETE_DATA,
+                            new MoveDataArgs(rangeStart, rangeEnd, null, 0)));
+
+            if (requestId == -1) {
+                logger.error("Unable to delete replicate data");
+                return false;
+            }
+
+            try {
+                KVMessage resMessage = targetConnection
+                        .receiveMessage(requestId);
+                KVMessage.StatusType resStatus = resMessage.getStatus();
+                if (resStatus == KVMessage.StatusType.ECS_SUCCESS) {
+                    return true;
+                } else {
+                    logger.error(
+                            "Failed to send data to next server: response status = " + resStatus
+                                    .toString());
+                    return false;
+                }
+            } catch (Exception e) {
+                logger.error(
+                        "Failed to receive ecs delete response from target server");
+                return false;
+            }
+        } catch (Exception e) {
+            logger.error("Unable to delete replicate data");
+            return false;
+        }
+        deleteReplicateData(rangeStart, rangeEnd, targetConnection);
     }
 
-    private void incrementalReplication(KVStorageDelta delta,
+    private boolean incrementalReplication(KVStorageDelta delta,
                                         ServerConnection targetConnection) {
-        throw new Error("Not implemented");
+        for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
+            String key = entry.getKey();
+            Value value = entry.getValue();
+            Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(Arrays.asList(KVMessage.StatusType.PUT_UPDATE, KVMessage.StatusType.PUT_SUCCESS));
+            boolean result = sendCommandToNode(targetConnection, new KVMessageImpl(key, value.get(), KVMessage.StatusType.ECS_PUT), status_Set);
+            if(!result){
+                logger.error("Incrementally Replication Failed");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean sendCommandToNode(ServerConnection targetConnection,
+                                      KVMessage msg,
+                                      Set<KVMessage.StatusType> successStatus) {
+        try {
+            int requestId = targetConnection
+                    .sendRequest(msg);
+
+            if (requestId == -1) {
+                logger.error(
+                        String.format("Unable to send message to node %s:%d",
+                                targetConnection.getAddress(),
+                                targetConnection.getPort()));
+                return false;
+            }
+
+            try {
+                KVMessage resMessage = targetConnection
+                        .receiveMessage(requestId);
+                KVMessage.StatusType resStatus = resMessage.getStatus();
+                if (successStatus.contains(resStatus)) {
+                    return true;
+                } else {
+                    logger.error(String.format(
+                            "Node %s:%d responded with failure: " + resMessage
+                                    .getValue(),
+                            targetConnection.getAddress(),
+                            targetConnection.getPort()));
+                    return false;
+                }
+            } catch (Exception e) {
+                logger.error(String.format(
+                        "Failed to receive response from Node %s:%d",
+                        targetConnection.getAddress(),
+                        targetConnection.getPort()));
+                return false;
+            }
+        } catch (Exception e) {
+            logger.error(String.format(
+                    "Failed to send command to Node %s:%d",
+                    targetConnection.getAddress(),
+                    targetConnection.getPort()));
+            return false;
+        }
     }
 }

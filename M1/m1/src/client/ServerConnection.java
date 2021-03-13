@@ -34,12 +34,22 @@ public class ServerConnection {
     private IProtocol protocol;
     private ISerializer<KVMessage> serializer;
     private final BlockingQueue<Response> watcherQueue = new LinkedBlockingQueue<>();
+
     private String address;
+
     private int port;
 
     private boolean neverConnected = true;
 
     private int nextID = 0;
+
+    public String getAddress() {
+        return address;
+    }
+
+    public int getPort() {
+        return port;
+    }
 
     public ServerConnection(IProtocol protocol,
                             ISerializer<KVMessage> serializer,
