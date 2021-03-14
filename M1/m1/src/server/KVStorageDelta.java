@@ -2,6 +2,7 @@ package server;
 
 import shared.Metadata;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,6 +37,7 @@ public class KVStorageDelta {
     public KVStorageDelta(int logicalTime,
                           String hashRangeStart,
                           String hashRangeEnd) {
+        this.values = new HashMap<>();
         this.logicalTime = logicalTime;
         this.hashRangeStart = hashRangeStart;
         this.hashRangeEnd = hashRangeEnd;
