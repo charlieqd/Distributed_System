@@ -88,7 +88,7 @@ public class Replicator extends Thread {
         while (running.get()) {
             if (enabled.get()) {
                 checkReplicaStates();
-                replicateStep();
+                replicate();
             }
 
             try {
@@ -122,6 +122,11 @@ public class Replicator extends Thread {
 
                     selfRangeStart = newSelfRangeStart;
                     selfRangeEnd = newSelfRangeEnd;
+
+                    storage.startNextDeltaRecording(logicalTime++,
+                            selfRangeStart,
+                            selfRangeEnd);
+                    deltas.clear();
                 }
 
                 // Detect replicas
@@ -161,58 +166,132 @@ public class Replicator extends Thread {
         }
     }
 
-    private void replicateStep() {
-        if (replicaStates.size() == 0) {
-            return;
-        }
+    private void replicate() {
+        replicating.set(true);
+        try {
+            if (replicaStates.size() == 0) {
+                return;
+            }
 
-        if (nextReplica >= replicaStates.size()) {
-            nextReplica = 0;
-        }
+            if (nextReplica >= replicaStates.size()) {
+                nextReplica = 0;
+            }
 
-        ReplicaState state = replicaStates.get(nextReplica);
-        nextReplica++;
+            ReplicaState state = replicaStates.get(nextReplica);
+            nextReplica++;
 
-        Integer lastSyncLogicalTime = state.getLastSyncLogicalTime();
+            Integer lastSyncLogicalTime = state.getLastSyncLogicalTime();
+            // Note that if connection is not valid, this will be null, which
+            // forces a full replication.
 
-        boolean incrementalAllowed = false;
-        int deltaIndex = -1;
+            boolean incrementalAllowed = false;
+            int deltaIndex = -1;
 
-        if (lastSyncLogicalTime != null) {
-            for (int i = 0; i < deltas.size(); ++i) {
-                KVStorageDelta delta = deltas.get(i);
-                if (delta.getLogicalTime() == lastSyncLogicalTime) {
-                    deltaIndex = i;
-                    break;
+            if (lastSyncLogicalTime != null) {
+                for (int i = 0; i < deltas.size(); ++i) {
+                    KVStorageDelta delta = deltas.get(i);
+                    if (delta.getLogicalTime() == lastSyncLogicalTime) {
+                        deltaIndex = i;
+                        break;
+                    }
+                }
+                if (deltaIndex != -1) {
+                    incrementalAllowed = true;
                 }
             }
-            if (deltaIndex != -1) {
-                incrementalAllowed = true;
+
+            if (!state.connection.isConnectionValid()) {
+                // Attempt to connect
+                state.connection.disconnect(true);
+                try {
+                    state.connection.connect();
+                } catch (Exception e) {
+                    logger.error(String.format(
+                            "Unable to connect to replica %s",
+                            state.name), e);
+                }
             }
-        }
 
-        KVStorageDelta newDelta = storage
-                .startNextDeltaRecording(logicalTime++);
-        if (newDelta != null) {
-            deltas.add(newDelta);
-        }
-        if (incrementalAllowed) {
+            // Attempt incremental replication
+            if (incrementalAllowed) {
+                KVStorageDelta newDelta = storage
+                        .startNextDeltaRecording(logicalTime++, selfRangeStart,
+                                selfRangeEnd);
+                if (newDelta == null) {
+                    // Fall-back to full replication
+                    deltas.clear();
+                    incrementalAllowed = false;
+                } else {
+                    deltas.add(newDelta);
+                }
 
-        }
+                if (incrementalAllowed) {
+                    for (int i = deltaIndex; i < deltas.size(); ++i) {
+                        KVStorageDelta delta = deltas.get(i);
+                        if (!enabled.get()) {
+                            // Skip this replica
+                            break;
+                        }
+                        if (!state.connection.isConnectionValid()) {
+                            // Skip this replica
+                            state.reset();
+                            break;
+                        }
+                        boolean success = incrementalReplication(delta,
+                                state.connection);
+                        if (success) {
+                            if (i == deltas.size() - 1) {
+                                state.lastSyncLogicalTime = storage
+                                        .getCurrentDeltaLogicalTime();
+                            } else {
+                                state.lastSyncLogicalTime = deltas.get(i + 1)
+                                        .getLogicalTime();
+                            }
+                        } else {
+                            // Skip this replica
+                            // We can re-try this, since incremental replication
+                            // is idempotent
+                            break;
+                        }
+                    }
+                }
+            }
 
-        // TODO: remove deltas that will never be used, maybe at start?
-        throw new Error("Not implemented");
+            // Attempt full replication
+            if (!incrementalAllowed) {
+                // TODO lock special write lock
+                KVStorageDelta newDelta = storage
+                        .startNextDeltaRecording(logicalTime++, selfRangeStart,
+                                selfRangeEnd);
+                if (newDelta == null) {
+                    deltas.clear();
+                } else {
+                    deltas.add(newDelta);
+                }
+                boolean success = fullReplication(selfRangeStart, selfRangeEnd,
+                        state.connection);
+                if (success) {
+                    state.lastSyncLogicalTime = storage
+                            .getCurrentDeltaLogicalTime();
+                } else {
+                    // Skip this replica
+                    // We can re-try this, since full replication is idempotent
+                }
+                // TODO unlock special write lock
+            }
+
+            // TODO: remove deltas that will never be used, maybe at start?
+            throw new Error("Not implemented");
+        } finally {
+            replicating.set(false);
+        }
     }
 
     public void startReplication() {
         enabled.set(true);
-        throw new Error("Not implemented");
     }
 
     public void stopReplication() {
-        if (!enabled.get()) {
-            return;
-        }
         enabled.set(false);
         while (replicating.get()) {
             // Wait until ongoing replication stops
@@ -222,7 +301,6 @@ public class Replicator extends Thread {
                 logger.error(e);
             }
         }
-        throw new Error("Not implemented");
     }
 
     public void shutdown() {
@@ -233,18 +311,17 @@ public class Replicator extends Thread {
     private boolean fullReplication(String rangeStart,
                                     String rangeEnd,
                                     ServerConnection targetConnection) {
-
-        boolean success = deleteReplicateData(rangeStart, rangeEnd,
+        return deleteReplicaData(rangeStart, rangeEnd,
+                targetConnection) && copyDataTo(rangeStart, rangeEnd,
                 targetConnection);
-        success = success && copyDataTo(rangeStart,
-                rangeEnd, targetConnection);
-        return success;
-
     }
 
     private boolean incrementalReplication(KVStorageDelta delta,
                                            ServerConnection targetConnection) {
         for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
+            if (!enabled.get()) {
+                return false;
+            }
             String key = entry.getKey();
             Value value = entry.getValue();
             Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(
@@ -261,8 +338,8 @@ public class Replicator extends Thread {
         return true;
     }
 
-    private boolean deleteReplicateData(String rangeStart, String rangeEnd,
-                                        ServerConnection targetConnection) {
+    private boolean deleteReplicaData(String rangeStart, String rangeEnd,
+                                      ServerConnection targetConnection) {
         KVMessage msg = new KVMessageImpl(null, null,
                 null, KVMessage.StatusType.ECS_DELETE_DATA,
                 new MoveDataArgs(rangeStart, rangeEnd, null, 0));
@@ -284,6 +361,10 @@ public class Replicator extends Thread {
 
 
         for (String key : keys) {
+            if (!enabled.get()) {
+                return false;
+            }
+
             String value;
             try {
                 value = storage.get(key);

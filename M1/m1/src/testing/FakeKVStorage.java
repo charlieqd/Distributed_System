@@ -51,7 +51,9 @@ public class FakeKVStorage implements IKVStorage {
     }
 
     @Override
-    public KVStorageDelta startNextDeltaRecording(int logicalTime) {
+    public KVStorageDelta startNextDeltaRecording(int logicalTime,
+                                                  String hashRangeStart,
+                                                  String hashRangeEnd) {
         throw new Error("Not implemented");
     }
 }

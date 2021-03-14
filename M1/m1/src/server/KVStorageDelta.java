@@ -1,5 +1,7 @@
 package server;
 
+import shared.Metadata;
+
 import java.util.Map;
 import java.util.Set;
 
@@ -28,9 +30,15 @@ public class KVStorageDelta {
     private Map<String, Value> values;
 
     private final int logicalTime;
+    private final String hashRangeStart;
+    private final String hashRangeEnd;
 
-    public KVStorageDelta(int logicalTime) {
+    public KVStorageDelta(int logicalTime,
+                          String hashRangeStart,
+                          String hashRangeEnd) {
         this.logicalTime = logicalTime;
+        this.hashRangeStart = hashRangeStart;
+        this.hashRangeEnd = hashRangeEnd;
     }
 
     public int getLogicalTime() {
@@ -45,6 +53,23 @@ public class KVStorageDelta {
      * Record a write operation; value can be null to indicate a delete.
      */
     public void put(String key, String value) {
+        String keyHash = Metadata.getRingPosition(key);
+        boolean isResponsible = false;
+        if (hashRangeStart.compareTo(hashRangeEnd) > 0) {
+            if (keyHash.compareTo(hashRangeStart) > 0 || keyHash
+                    .compareTo(hashRangeEnd) <= 0) {
+                isResponsible = true;
+            }
+        } else {
+            if (keyHash.compareTo(hashRangeStart) > 0 && keyHash
+                    .compareTo(hashRangeEnd) <= 0) {
+                isResponsible = true;
+            }
+        }
+        if (!isResponsible) {
+            return;
+        }
+
         if (!values.containsKey(key)) {
             values.put(key, new Value());
         }

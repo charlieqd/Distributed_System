@@ -185,11 +185,14 @@ public class KVStorage implements IKVStorage {
     }
 
     @Override
-    public KVStorageDelta startNextDeltaRecording(int logicalTime) {
+    public KVStorageDelta startNextDeltaRecording(int logicalTime,
+                                                  String hashRangeStart,
+                                                  String hashRangeEnd) {
         lock.lock();
         try {
             KVStorageDelta lastDelta = delta;
-            delta = new KVStorageDelta(logicalTime);
+            delta = new KVStorageDelta(logicalTime, hashRangeStart,
+                    hashRangeEnd);
             return lastDelta;
         } finally {
             lock.unlock();

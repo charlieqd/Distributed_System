@@ -29,5 +29,7 @@ public interface IKVStorage {
      * the current logical time. The next delta will have the given logical time
      * (returned when the next getCurrentDeltaLogicalTime() is called).
      */
-    KVStorageDelta startNextDeltaRecording(int logicalTime);
+    KVStorageDelta startNextDeltaRecording(int logicalTime,
+                                           String hashRangeStart,
+                                           String hashRangeEnd);
 }
