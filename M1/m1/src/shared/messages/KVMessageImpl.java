@@ -125,6 +125,10 @@ public class KVMessageImpl implements KVMessage, Serializable {
                         .safeToString(ecsCommandArg) + ")>";
             case ECS_UPDATE_METADATA:
                 return statusName + "<(" + Util.safeToString(metadata) + ")>";
+            case ECS_START_REPLICATION:
+                return statusName;
+            case ECS_STOP_REPLICATION:
+                return statusName;
             case FAILED:
                 return statusName + "<" + value + ">";
         }

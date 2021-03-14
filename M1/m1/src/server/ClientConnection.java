@@ -139,7 +139,7 @@ public class ClientConnection implements Runnable {
                 KVMessage.StatusType.SERVER_WRITE_LOCK);
     }
 
-    private boolean isResponsibleForKey(String key) {
+    private boolean isResponsibleForKeyWrite(String key) {
         String nodeName = server.getNodeName();
         if (nodeName == null) {
             logger.error("Server name is null");
@@ -150,6 +150,34 @@ public class ClientConnection implements Runnable {
 
         ECSNode node = metadata.getServer(Metadata.getRingPosition(key));
         return node != null && nodeName.equals(node.getNodeName());
+    }
+
+    private boolean isResponsibleForKeyRead(String key) {
+        String nodeName = server.getNodeName();
+        if (nodeName == null) {
+            logger.error("Server name is null");
+            return false;
+        }
+        Metadata metadata = server.metadata.get();
+        if (metadata == null) return false;
+
+        ECSNode node = metadata.getServer(Metadata.getRingPosition(key));
+        if (node == null) {
+            return false;
+        }
+        if (nodeName.equals(node.getNodeName())) {
+            return true;
+        }
+        // Replicas can serve read request
+        node = metadata.getSuccessor(node);
+        if (nodeName.equals(node.getNodeName())) {
+            return true;
+        }
+        node = metadata.getSuccessor(node);
+        if (nodeName.equals(node.getNodeName())) {
+            return true;
+        }
+        return false;
     }
 
     private KVMessage handleNotResponsible() {
@@ -186,7 +214,7 @@ public class ClientConnection implements Runnable {
                 }
                 if (!server.serving.get()) {
                     responseMessage = handleNotServing();
-                } else if (!isResponsibleForKey(key)) {
+                } else if (!isResponsibleForKeyRead(key)) {
                     responseMessage = handleNotResponsible();
                 } else {
                     String value;
@@ -225,7 +253,7 @@ public class ClientConnection implements Runnable {
 
                 if (isClientPut && !server.serving.get()) {
                     responseMessage = handleNotServing();
-                } else if (isClientPut && !isResponsibleForKey(key)) {
+                } else if (isClientPut && !isResponsibleForKeyWrite(key)) {
                     responseMessage = handleNotResponsible();
                 } else if (isClientPut && server.writeLock.get()) {
                     responseMessage = handleWriteLocked();
@@ -377,12 +405,30 @@ public class ClientConnection implements Runnable {
             }
 
             case ECS_START_REPLICATION: {
-                server.getReplicator().startReplication();
+                try {
+                    server.getReplicator().startReplication();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error: " + Util
+                                    .getStackTraceString(e),
+                            KVMessage.StatusType.FAILED);
+                }
                 break;
             }
 
             case ECS_STOP_REPLICATION: {
-                server.getReplicator().stopReplication();
+                try {
+                    server.getReplicator().stopReplication();
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.ECS_SUCCESS);
+                } catch (Exception e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error: " + Util
+                                    .getStackTraceString(e),
+                            KVMessage.StatusType.FAILED);
+                }
                 break;
             }
 

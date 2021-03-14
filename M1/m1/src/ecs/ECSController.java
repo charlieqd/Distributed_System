@@ -327,15 +327,15 @@ public class ECSController implements ZooKeeperListener {
                     logger.error("Unable to delete transferred data");
                     return null;
                 }
-            }
 
-            try {
-                sendCommandToNode(new KVMessageImpl(null, null,
-                                KVMessage.StatusType.ECS_START_REPLICATION),
-                        successorNode);
-            } catch (NodeCommandException nce) {
-                logger.error("Unable to start replication");
-                return null;
+                try {
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    KVMessage.StatusType.ECS_START_REPLICATION),
+                            successorNode);
+                } catch (NodeCommandException nce) {
+                    logger.error("Unable to start replication");
+                    return null;
+                }
             }
 
             try {
@@ -500,12 +500,14 @@ public class ECSController implements ZooKeeperListener {
                         node.getNodeName()));
             }
 
-            try {
-                sendCommandToNode(new KVMessageImpl(null, null,
-                                KVMessage.StatusType.ECS_START_REPLICATION),
-                        successorNode);
-            } catch (NodeCommandException nce) {
-                logger.error("Unable to start replication");
+            if (successorNode != null) {
+                try {
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    KVMessage.StatusType.ECS_START_REPLICATION),
+                            successorNode);
+                } catch (NodeCommandException nce) {
+                    logger.error("Unable to start replication");
+                }
             }
 
             return success;
@@ -800,6 +802,8 @@ public class ECSController implements ZooKeeperListener {
         List<ECSNode> activeNodes = getNodesWithStatus(
                 ECSNodeState.Status.ACTIVATED);
 
+        // Server launch detection
+
         for (String nodeName : children) {
             String[] components = nodeName.split("/");
             nodeName = components[components.length - 1];
@@ -820,36 +824,51 @@ public class ECSController implements ZooKeeperListener {
             }
         }
 
-        new Thread(() -> {
-            lock.lock();
-            try {
-                int numProblemNode = removeProblemNode(activeNodes, children);
-                if (numProblemNode != 0) {
-                    logger.warn(String.format("Detected %d failed nodes",
-                            numProblemNode));
-                    Metadata newMetadata = computeMetadata();
-                    try {
-                        updateActiveNodesMetadata(newMetadata);
-                    } catch (NodeCommandException e) {
-                        logger.error("Unable to update metadata on all nodes");
-                    }
-                    addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
-                            DEFAULT_CACHE_SIZE);
-                }
-            } finally {
-                lock.unlock();
-            }
-        }).start();
-    }
+        // Failure detection
 
-    private int removeProblemNode(List<ECSNode> activeNodes,
-                                  List<String> children) {
         Set<String> cSet = new HashSet<>();
         for (String nodeName : children) {
             String[] components = nodeName.split("/");
             nodeName = components[components.length - 1];
             cSet.add(nodeName);
         }
+
+        int potentialProblemNodes = 0;
+        for (ECSNode node : activeNodes) {
+            ECSNodeState state = getNodeState(node);
+            if (state.getStatus()
+                    .get() == ECSNodeState.Status.ACTIVATED && !cSet
+                    .contains(node.getNodeName())) {
+                potentialProblemNodes += 1;
+            }
+        }
+        if (potentialProblemNodes > 0) {
+            new Thread(() -> {
+                lock.lock();
+                try {
+                    int numProblemNode = removeProblemNode(activeNodes, cSet);
+                    if (numProblemNode != 0) {
+                        logger.warn(String.format("Detected %d failed nodes",
+                                numProblemNode));
+                        Metadata newMetadata = computeMetadata();
+                        try {
+                            updateActiveNodesMetadata(newMetadata);
+                        } catch (NodeCommandException e) {
+                            logger.error(
+                                    "Unable to update metadata on all nodes");
+                        }
+                        addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
+                                DEFAULT_CACHE_SIZE);
+                    }
+                } finally {
+                    lock.unlock();
+                }
+            }).start();
+        }
+    }
+
+    private int removeProblemNode(List<ECSNode> activeNodes,
+                                  Set<String> cSet) {
         int numProblemNode = 0;
         for (ECSNode node : activeNodes) {
             ECSNodeState state = getNodeState(node);
@@ -857,6 +876,7 @@ public class ECSController implements ZooKeeperListener {
                     .get() == ECSNodeState.Status.ACTIVATED && !cSet
                     .contains(node.getNodeName())) {
                 numProblemNode += 1;
+                state.getConnection().disconnect(true);
                 state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
             }
         }

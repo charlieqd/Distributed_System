@@ -9,8 +9,7 @@ import shared.messages.KVMessageImpl;
 import shared.messages.KVMessageSerializer;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class KVStore implements KVCommInterface {
 
@@ -158,9 +157,17 @@ public class KVStore implements KVCommInterface {
                 }
             } else {
                 if (connections.isEmpty()) return null;
-                // then connect with the replica
-                ECSNode nodeInvalid = cachedMetadata.getServer(ringPosition);
-                ringPosition = cachedMetadata.getSuccessor(nodeInvalid).getPosition();
+                // Attempt to connect to replica
+                List<String> ringPositions = new ArrayList<>(
+                        connections.keySet());
+                Collections.sort(ringPositions);
+                int index = ringPositions.indexOf(ringPosition);
+                if (index == -1) {
+                    ringPosition = ringPositions.get(0);
+                } else {
+                    ringPosition = ringPositions
+                            .get((index + 1) % ringPositions.size());
+                }
                 connection = connections.get(ringPosition);
             }
         }

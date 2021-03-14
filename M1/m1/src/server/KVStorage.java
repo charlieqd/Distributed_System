@@ -34,7 +34,7 @@ public class KVStorage implements IKVStorage {
 
     private KVStorageDelta delta = null;
 
-    private static final Integer maximumDeltaSize = 10000;
+    private static final int maximumDeltaSize = 10000;
 
     /**
      * @param rootPath
@@ -104,10 +104,9 @@ public class KVStorage implements IKVStorage {
 
             if (delta != null) {
                 delta.put(key, value);
-            }
-
-            if(delta.getEntryCount() > maximumDeltaSize){
-                delta = null;
+                if (delta.getEntryCount() > maximumDeltaSize) {
+                    delta = null;
+                }
             }
 
             return response;

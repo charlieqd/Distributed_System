@@ -48,6 +48,8 @@ public class Replicator extends Thread {
 
     private static final long UPDATE_MILLIS = 1000;
 
+    private static final int MAX_TOTAL_DELTA_SIZE = 20000;
+
     private static Logger logger = Logger.getRootLogger();
 
     private IProtocol protocol;
@@ -280,23 +282,37 @@ public class Replicator extends Thread {
                 }
                 server.unlockSelfWrite();
             }
-            int minimalTime = -1;
-            boolean found = false;
-            for (Replicator.ReplicaState r : replicaStates) {
-                if (!found || r.getLastSyncLogicalTime() < minimalTime) {
-                    found = true;
-                    minimalTime = r.getLastSyncLogicalTime();
+
+            // Remove unused delta
+
+            Integer minSyncTime = null;
+            for (ReplicaState s : replicaStates) {
+                Integer lastSyncTime = s.getLastSyncLogicalTime();
+                if (minSyncTime == null ||
+                        (lastSyncTime != null && lastSyncTime < minSyncTime)) {
+                    minSyncTime = lastSyncTime;
                 }
             }
 
             Set<KVStorageDelta> removedList = new HashSet<KVStorageDelta>();
             for (KVStorageDelta d : deltas) {
-                if (d.getLogicalTime() < minimalTime) {
+                if (minSyncTime == null || d.getLogicalTime() < minSyncTime) {
                     removedList.add(d);
                 }
             }
 
             deltas.removeAll(removedList);
+
+            // Check total delta size
+
+            int totalDeltaSize = 0;
+            for (KVStorageDelta d : deltas) {
+                totalDeltaSize += d.getEntryCount();
+            }
+            if (totalDeltaSize > MAX_TOTAL_DELTA_SIZE) {
+                deltas.clear();
+            }
+
         } finally {
             replicating.set(false);
         }
