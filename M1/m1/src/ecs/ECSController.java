@@ -771,7 +771,9 @@ public class ECSController implements ZooKeeperListener {
 
     @Override
     public void handleZooKeeperEvent(WatchedEvent event) {
+        System.out.println("HIHIHI");
         lock.lock();
+        System.out.println("ENZTERRR");
         try {
             if (event
                     .getType() == Watcher.Event.EventType.NodeChildrenChanged) {
