@@ -34,7 +34,7 @@ public class KVStorage implements IKVStorage {
 
     private KVStorageDelta delta = null;
 
-    private static final Integer maximumDeltaSize = 1000;
+    private static final Integer maximumDeltaSize = 10000;
 
     /**
      * @param rootPath
