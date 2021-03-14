@@ -347,14 +347,18 @@ public class AdditionalTest {
             server = new KVServer(
                     new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
                             1024, IKVServer.CacheStrategy.LRU), new Protocol(),
-                    new KVMessageSerializer(), 50001, "testServer", null);
+                    new KVMessageSerializer(), 50001, "testServer4", null);
             server.start();
             server.startServing();
             server.updateMetadata(new Metadata(Arrays.asList(
                     new ECSNode("testServer2", "127.0.0.1", 50002,
                             "0cc175b9c0f1b6a831c399e269772661"),
-                    new ECSNode("testServer", "127.0.0.1", 50001,
-                            "92eb5ffee6ae2fec3ad71c777531578f"))));
+                    new ECSNode("testServer4", "127.0.0.1", 50001,
+                            "92eb5ffee6ae2fec3ad71c777531578f"),
+                    new ECSNode("testServer2", "127.0.0.1", 50003,
+                            "4a8a08f09d37b73795649038408b5f33"),
+                    new ECSNode("testServer3", "127.0.0.1", 50004,
+                            "8277e0910d750195b448797616e091ad"))));
             Thread.sleep(1000);
 
             connection = new ServerConnection(new Protocol(),
