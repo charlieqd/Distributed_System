@@ -47,6 +47,9 @@ public class KVServer extends Thread implements IKVServer {
 
     public final AtomicBoolean serving = new AtomicBoolean(false);
     public final AtomicBoolean writeLock = new AtomicBoolean(false);
+
+    public final AtomicBoolean selfWriteLock = new AtomicBoolean(false);
+
     public final AtomicReference<Metadata> metadata = new AtomicReference<>(
             null);
 
@@ -367,6 +370,17 @@ public class KVServer extends Thread implements IKVServer {
      */
     public void unlockWrite() {
         writeLock.set(false);
+    }
+
+    public void lockSelfWrite() {
+        selfWriteLock.set(true);
+    }
+
+    /**
+     * Unlock the KVServer for write operations.
+     */
+    public void unlockSelfWrite() {
+        selfWriteLock.set(false);
     }
 
     /**

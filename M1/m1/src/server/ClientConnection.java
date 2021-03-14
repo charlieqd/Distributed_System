@@ -229,6 +229,8 @@ public class ClientConnection implements Runnable {
                     responseMessage = handleNotResponsible();
                 } else if (isClientPut && server.writeLock.get()) {
                     responseMessage = handleWriteLocked();
+                } else if (isClientPut && server.selfWriteLock.get()) {
+                    responseMessage = handleWriteLocked();
                 } else {
                     String value = requestMessage.getValue();
 

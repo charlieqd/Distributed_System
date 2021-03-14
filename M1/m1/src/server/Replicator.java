@@ -259,7 +259,7 @@ public class Replicator extends Thread {
 
             // Attempt full replication
             if (!incrementalAllowed) {
-                // TODO lock special write lock
+                server.lockSelfWrite();
                 KVStorageDelta newDelta = storage
                         .startNextDeltaRecording(logicalTime++, selfRangeStart,
                                 selfRangeEnd);
@@ -277,7 +277,7 @@ public class Replicator extends Thread {
                     // Skip this replica
                     // We can re-try this, since full replication is idempotent
                 }
-                // TODO unlock special write lock
+                server.unlockSelfWrite();
             }
 
             // TODO: remove deltas that will never be used, maybe at start?
