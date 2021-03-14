@@ -234,6 +234,7 @@ public class Replicator extends Thread {
                         }
                         if (!state.connection.isConnectionValid()) {
                             // Skip this replica
+                            // Fall-back to full replication next time
                             state.reset();
                             break;
                         }
@@ -249,8 +250,8 @@ public class Replicator extends Thread {
                             }
                         } else {
                             // Skip this replica
-                            // We can re-try this, since incremental replication
-                            // is idempotent
+                            // Fall-back to full replication next time
+                            state.reset();
                             break;
                         }
                     }
@@ -325,6 +326,8 @@ public class Replicator extends Thread {
     private boolean fullReplication(String rangeStart,
                                     String rangeEnd,
                                     ServerConnection targetConnection) {
+        logger.info(String.format("Performing full replication to %s:%d",
+                targetConnection.getAddress(), targetConnection.getPort()));
         return deleteReplicaData(rangeStart, rangeEnd,
                 targetConnection) && copyDataTo(rangeStart, rangeEnd,
                 targetConnection);
@@ -332,20 +335,25 @@ public class Replicator extends Thread {
 
     private boolean incrementalReplication(KVStorageDelta delta,
                                            ServerConnection targetConnection) {
+        logger.info(String.format(
+                "Performing incremental replication (%d entries) to %s:%d",
+                delta.getEntryCount(), targetConnection.getAddress(),
+                targetConnection.getPort()));
         for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
             if (!enabled.get()) {
+                logger.info("Incremental replication interrupted");
                 return false;
             }
             String key = entry.getKey();
             Value value = entry.getValue();
-            Set<KVMessage.StatusType> status_Set = new HashSet<KVMessage.StatusType>(
+            Set<KVMessage.StatusType> statusSet = new HashSet<>(
                     Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
                             KVMessage.StatusType.PUT_SUCCESS));
             boolean result = sendCommandToNode(targetConnection,
                     new KVMessageImpl(key, value.get(),
-                            KVMessage.StatusType.ECS_PUT), status_Set);
+                            KVMessage.StatusType.ECS_PUT), statusSet);
             if (!result) {
-                logger.error("Incrementally Replication Failed");
+                logger.error("Incremental replication command failed");
                 return false;
             }
         }
@@ -358,7 +366,7 @@ public class Replicator extends Thread {
                 null, KVMessage.StatusType.ECS_DELETE_DATA,
                 new MoveDataArgs(rangeStart, rangeEnd, null, 0));
         return sendCommandToNode(targetConnection, msg,
-                new HashSet<KVMessage.StatusType>(
+                new HashSet<>(
                         Arrays.asList(KVMessage.StatusType.ECS_SUCCESS)));
     }
 
@@ -369,13 +377,14 @@ public class Replicator extends Thread {
         try {
             keys = storage.getAllKeys(hashRangeStart, hashRangeEnd);
         } catch (IOException e) {
-            logger.error(e);
+            logger.error("Full replication failed to scan for local keys", e);
             return false;
         }
 
 
         for (String key : keys) {
             if (!enabled.get()) {
+                logger.info("Full replication interrupted");
                 return false;
             }
 
@@ -383,27 +392,27 @@ public class Replicator extends Thread {
             try {
                 value = storage.get(key);
             } catch (IOException e) {
-                logger.error("Internal server error: " +
-                        Util.getStackTraceString(e));
+                logger.error(
+                        "Full replication failed: storage error: " +
+                                Util.getStackTraceString(e));
                 return false;
             }
 
             KVMessage msg = new KVMessageImpl(key, value,
                     KVMessage.StatusType.ECS_PUT);
             boolean success = sendCommandToNode(targetConnection, msg,
-                    new HashSet<KVMessage.StatusType>(
+                    new HashSet<>(
                             Arrays.asList(KVMessage.StatusType.PUT_SUCCESS,
                                     KVMessage.StatusType.PUT_UPDATE)));
             if (!success) {
                 logger.error(String.format(
-                        "Failed to send put request (key: %s) to target server",
+                        "Full replication failed: failed to send put request (key: %s) to target server",
                         key));
                 return false;
             }
         }
 
-
-        logger.info("Successfully copy all data to target server.");
+        logger.info("Successfully copied all data to target server.");
         return true;
     }
 
@@ -411,8 +420,7 @@ public class Replicator extends Thread {
                                       KVMessage msg,
                                       Set<KVMessage.StatusType> successStatus) {
         try {
-            int requestId = targetConnection
-                    .sendRequest(msg);
+            int requestId = targetConnection.sendRequest(msg);
 
             if (requestId == -1) {
                 logger.error(
@@ -441,14 +449,14 @@ public class Replicator extends Thread {
                 logger.error(String.format(
                         "Failed to receive response from Node %s:%d",
                         targetConnection.getAddress(),
-                        targetConnection.getPort()));
+                        targetConnection.getPort()), e);
                 return false;
             }
         } catch (Exception e) {
             logger.error(String.format(
                     "Failed to send command to Node %s:%d",
                     targetConnection.getAddress(),
-                    targetConnection.getPort()));
+                    targetConnection.getPort()), e);
             return false;
         }
     }
