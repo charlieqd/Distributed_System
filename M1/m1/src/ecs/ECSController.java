@@ -244,6 +244,13 @@ public class ECSController implements ZooKeeperListener {
                     rangeStart = predecessor.getPosition();
                     rangeEnd = node.getPosition();
 
+                    // Delete data on receiver
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    null, KVMessage.StatusType.ECS_DELETE_DATA,
+                                    new MoveDataArgs(rangeStart, rangeEnd, null, 0)),
+                            node, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
+
+                    // Copy data to receiver
                     sendCommandToNode(new KVMessageImpl(null, null,
                                     null, KVMessage.StatusType.ECS_COPY_DATA,
                                     new MoveDataArgs(rangeStart, rangeEnd,
@@ -400,6 +407,13 @@ public class ECSController implements ZooKeeperListener {
                     String rangeStart = predecessor.getPosition();
                     String rangeEnd = node.getPosition();
 
+                    // Delete data on receiver
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    null, KVMessage.StatusType.ECS_DELETE_DATA,
+                                    new MoveDataArgs(rangeStart, rangeEnd, null, 0)),
+                            successorNode, MOVE_DATA_COMMAND_TIMEOUT_SECONDS);
+
+                    // Copy data to receiver
                     sendCommandToNode(new KVMessageImpl(null, null, null,
                                     KVMessage.StatusType.ECS_COPY_DATA,
                                     new MoveDataArgs(rangeStart, rangeEnd,
@@ -783,6 +797,9 @@ public class ECSController implements ZooKeeperListener {
     private void onZooKeeperChildrenChanged(List<String> children) {
         logger.info("ZooKeeper children changed.");
 
+        List<ECSNode> activeNodes = getNodesWithStatus(
+                ECSNodeState.Status.ACTIVATED);
+
         for (String nodeName : children) {
             String[] components = nodeName.split("/");
             nodeName = components[components.length - 1];
@@ -806,8 +823,10 @@ public class ECSController implements ZooKeeperListener {
         new Thread(() -> {
             lock.lock();
             try {
-                int numProblemNode = removeProblemNode(children);
+                int numProblemNode = removeProblemNode(activeNodes, children);
                 if (numProblemNode != 0) {
+                    logger.warn(String.format("Detected %d failed nodes",
+                            numProblemNode));
                     Metadata newMetadata = computeMetadata();
                     try {
                         updateActiveNodesMetadata(newMetadata);
@@ -823,14 +842,20 @@ public class ECSController implements ZooKeeperListener {
         }).start();
     }
 
-    private int removeProblemNode(List<String> children) {
-        Set<String> cSet = new HashSet<String>(children);
+    private int removeProblemNode(List<ECSNode> activeNodes,
+                                  List<String> children) {
+        Set<String> cSet = new HashSet<>();
+        for (String nodeName : children) {
+            String[] components = nodeName.split("/");
+            nodeName = components[components.length - 1];
+            cSet.add(nodeName);
+        }
         int numProblemNode = 0;
-        for (String node : nodeStates.keySet()) {
+        for (ECSNode node : activeNodes) {
             ECSNodeState state = getNodeState(node);
             if (state.getStatus()
                     .get() == ECSNodeState.Status.ACTIVATED && !cSet
-                    .contains(node)) {
+                    .contains(node.getNodeName())) {
                 numProblemNode += 1;
                 state.getStatus().set(ECSNodeState.Status.NOT_LAUNCHED);
             }
