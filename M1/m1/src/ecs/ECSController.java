@@ -229,6 +229,10 @@ public class ECSController implements ZooKeeperListener {
                 try {
                     logger.info("Transferring data");
 
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    KVMessage.StatusType.ECS_STOP_REPLICATION),
+                            successorNode);
+
                     // Set write lock
 
                     sendCommandToNode(new KVMessageImpl(null, null,
@@ -257,6 +261,16 @@ public class ECSController implements ZooKeeperListener {
                     } catch (NodeCommandException nce) {
                         logger.error("Unable to release write lock");
                     }
+
+                    try {
+                        sendCommandToNode(new KVMessageImpl(null, null,
+                                        KVMessage.StatusType.ECS_START_REPLICATION),
+                                successorNode);
+                    } catch (NodeCommandException nce) {
+                        logger.error("Unable to start replication");
+                        return null;
+                    }
+
                     try {
                         sendCommandToNode(new KVMessageImpl(null, null,
                                         KVMessage.StatusType.ECS_SHUTDOWN), node,
@@ -309,6 +323,23 @@ public class ECSController implements ZooKeeperListener {
                 }
             }
 
+            try {
+                sendCommandToNode(new KVMessageImpl(null, null,
+                                KVMessage.StatusType.ECS_START_REPLICATION),
+                        successorNode);
+            } catch (NodeCommandException nce) {
+                logger.error("Unable to start replication");
+                return null;
+            }
+
+            try {
+                sendCommandToNode(new KVMessageImpl(null, null,
+                        KVMessage.StatusType.ECS_START_REPLICATION), node);
+            } catch (NodeCommandException nce) {
+                logger.error("Unable to start replication");
+                return null;
+            }
+
             logger.info(String.format("Successfully added node %s",
                     node.getNodeName()));
 
@@ -321,6 +352,7 @@ public class ECSController implements ZooKeeperListener {
     public boolean removeNode(String nodeName) {
         lock.lock();
         try {
+
             ECSNodeState state = getNodeState(nodeName);
             if (state == null) {
                 logger.error("Node not found: " + nodeName);
@@ -333,6 +365,14 @@ public class ECSController implements ZooKeeperListener {
             }
 
             ECSNode node = state.getNode();
+
+            try {
+                sendCommandToNode(new KVMessageImpl(null, null,
+                        KVMessage.StatusType.ECS_STOP_REPLICATION), node);
+            } catch (NodeCommandException nce) {
+                logger.error("Unable to stop replication");
+                return false;
+            }
 
             // Remove from list of active servers
             state.getStatus().set(ECSNodeState.Status.CONNECTED);
@@ -347,8 +387,11 @@ public class ECSController implements ZooKeeperListener {
                 try {
                     logger.info("Transferring data");
 
-                    // Set write lock
+                    sendCommandToNode(new KVMessageImpl(null, null,
+                                    KVMessage.StatusType.ECS_STOP_REPLICATION),
+                            successorNode);
 
+                    // Set write lock
                     sendCommandToNode(new KVMessageImpl(null, null,
                             KVMessage.StatusType.ECS_LOCK_WRITE), node);
 
@@ -374,6 +417,23 @@ public class ECSController implements ZooKeeperListener {
                         logger.error("Unable to release write lock");
                     }
                     state.getStatus().set(ECSNodeState.Status.ACTIVATED);
+
+                    try {
+                        sendCommandToNode(new KVMessageImpl(null, null,
+                                        KVMessage.StatusType.ECS_START_REPLICATION),
+                                node);
+                    } catch (NodeCommandException nce) {
+                        logger.error("Unable to start replication");
+                    }
+
+                    try {
+                        sendCommandToNode(new KVMessageImpl(null, null,
+                                        KVMessage.StatusType.ECS_START_REPLICATION),
+                                successorNode);
+                    } catch (NodeCommandException nce) {
+                        logger.error("Unable to start replication");
+                    }
+
                     return false;
                 }
             } else {
@@ -425,6 +485,14 @@ public class ECSController implements ZooKeeperListener {
             if (success) {
                 logger.info(String.format("Successfully removed node %s",
                         node.getNodeName()));
+            }
+
+            try {
+                sendCommandToNode(new KVMessageImpl(null, null,
+                                KVMessage.StatusType.ECS_START_REPLICATION),
+                        successorNode);
+            } catch (NodeCommandException nce) {
+                logger.error("Unable to start replication");
             }
 
             return success;

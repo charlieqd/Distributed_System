@@ -374,6 +374,16 @@ public class ClientConnection implements Runnable {
                 break;
             }
 
+            case ECS_START_REPLICATION: {
+                server.getReplicator().startReplication();
+                break;
+            }
+
+            case ECS_STOP_REPLICATION: {
+                server.getReplicator().stopReplication();
+                break;
+            }
+
             default: {
                 responseMessage = new KVMessageImpl(null,
                         "Bad request status type: " +

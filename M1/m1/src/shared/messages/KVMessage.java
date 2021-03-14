@@ -103,6 +103,14 @@ public interface KVMessage {
          */
         ECS_UPDATE_METADATA,
         /**
+         * ECS: start replicator
+         */
+        ECS_START_REPLICATION,
+        /**
+         * ECS: stop replicator
+         */
+        ECS_STOP_REPLICATION,
+        /**
          * Any other error
          */
         FAILED
@@ -140,5 +148,3 @@ public interface KVMessage {
     public StatusType getStatus();
 
 }
-
-

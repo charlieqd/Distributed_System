@@ -78,6 +78,10 @@ public class KVServer extends Thread implements IKVServer {
         this.replicator.start();
     }
 
+    public Replicator getReplicator() {
+        return replicator;
+    }
+
     /**
      * Initializes and starts the server. Loops until the the server should be
      * closed.
