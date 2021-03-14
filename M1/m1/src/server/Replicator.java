@@ -57,7 +57,7 @@ public class Replicator extends Thread {
     private final KVServer server;
     private final IKVStorage storage;
 
-    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicBoolean enabled = new AtomicBoolean(false);
     private final AtomicBoolean replicating = new AtomicBoolean(false);
 
