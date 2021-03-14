@@ -190,6 +190,11 @@ public class Replicator extends Thread {
             int deltaIndex = -1;
 
             if (lastSyncLogicalTime != null) {
+                Integer currentDeltaLogicalTime = storage
+                        .getCurrentDeltaLogicalTime();
+                if (lastSyncLogicalTime.equals(currentDeltaLogicalTime)) {
+                    deltaIndex = deltas.size();
+                }
                 for (int i = 0; i < deltas.size(); ++i) {
                     KVStorageDelta delta = deltas.get(i);
                     if (delta.getLogicalTime() == lastSyncLogicalTime) {
@@ -313,6 +318,8 @@ public class Replicator extends Thread {
                 deltas.clear();
             }
 
+        } catch (Exception e) {
+            logger.error("Internal server error during replication", e);
         } finally {
             replicating.set(false);
         }
