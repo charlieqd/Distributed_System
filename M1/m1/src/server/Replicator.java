@@ -50,6 +50,12 @@ public class Replicator extends Thread {
 
     private static final int MAX_TOTAL_DELTA_SIZE = 20000;
 
+    private static final Set<KVMessage.StatusType> REPLICATION_SUCCESS_STATUSES = new HashSet<>(
+            Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
+                    KVMessage.StatusType.PUT_SUCCESS,
+                    KVMessage.StatusType.DELETE_SUCCESS,
+                    KVMessage.StatusType.DELETE_ERROR));
+
     private static Logger logger = Logger.getRootLogger();
 
     private IProtocol protocol;
@@ -245,8 +251,10 @@ public class Replicator extends Thread {
                             state.reset();
                             break;
                         }
-                        boolean success = incrementalReplication(delta,
-                                state.connection);
+                        // Automatically "succeed" if delta is empty
+                        boolean success = delta.getEntryCount() == 0 ||
+                                incrementalReplication(delta,
+                                        state.connection);
                         if (success) {
                             if (i == deltas.size() - 1) {
                                 state.lastSyncLogicalTime = storage
@@ -369,12 +377,10 @@ public class Replicator extends Thread {
             }
             String key = entry.getKey();
             Value value = entry.getValue();
-            Set<KVMessage.StatusType> statusSet = new HashSet<>(
-                    Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
-                            KVMessage.StatusType.PUT_SUCCESS));
             boolean result = sendCommandToNode(targetConnection,
                     new KVMessageImpl(key, value.get(),
-                            KVMessage.StatusType.ECS_PUT), statusSet);
+                            KVMessage.StatusType.ECS_PUT),
+                    REPLICATION_SUCCESS_STATUSES);
             if (!result) {
                 logger.error("Incremental replication command failed");
                 return false;
@@ -424,9 +430,7 @@ public class Replicator extends Thread {
             KVMessage msg = new KVMessageImpl(key, value,
                     KVMessage.StatusType.ECS_PUT);
             boolean success = sendCommandToNode(targetConnection, msg,
-                    new HashSet<>(
-                            Arrays.asList(KVMessage.StatusType.PUT_SUCCESS,
-                                    KVMessage.StatusType.PUT_UPDATE)));
+                    REPLICATION_SUCCESS_STATUSES);
             if (!success) {
                 logger.error(String.format(
                         "Full replication failed: failed to send put request (key: %s) to target server",
@@ -462,8 +466,8 @@ public class Replicator extends Thread {
                     return true;
                 } else {
                     logger.error(String.format(
-                            "Node %s:%d responded with failure: " + resMessage
-                                    .getValue(),
+                            "Node %s:%d responded with failure: " +
+                                    resMessage.toString(),
                             targetConnection.getAddress(),
                             targetConnection.getPort()));
                     return false;
