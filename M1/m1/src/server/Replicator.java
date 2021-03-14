@@ -346,9 +346,9 @@ public class Replicator extends Thread {
         running.set(false);
     }
 
-    private boolean fullReplication(String rangeStart,
-                                    String rangeEnd,
-                                    ServerConnection targetConnection) {
+    public boolean fullReplication(String rangeStart,
+                                   String rangeEnd,
+                                   ServerConnection targetConnection) {
         logger.info(String.format("Performing full replication to %s:%d",
                 targetConnection.getAddress(), targetConnection.getPort()));
         return deleteReplicaData(rangeStart, rangeEnd,
@@ -356,8 +356,8 @@ public class Replicator extends Thread {
                 targetConnection);
     }
 
-    private boolean incrementalReplication(KVStorageDelta delta,
-                                           ServerConnection targetConnection) {
+    public boolean incrementalReplication(KVStorageDelta delta,
+                                          ServerConnection targetConnection) {
         logger.info(String.format(
                 "Performing incremental replication (%d entries) to %s:%d",
                 delta.getEntryCount(), targetConnection.getAddress(),

@@ -552,4 +552,67 @@ public class AdditionalTest {
             }
         }
     }
+
+    @Test
+    public void testReplicatorFullReplication() throws Exception {
+        KVServer server = null;
+        ServerConnection connection = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            server = new KVServer(
+                    new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+                            1024, IKVServer.CacheStrategy.LRU), new Protocol(),
+                    new KVMessageSerializer(), 50001, "testServer4", null);
+            server.start();
+            server.startServing();
+            server.updateMetadata(new Metadata(Arrays.asList(
+                    new ECSNode("testServer1", "127.0.0.1", 50002,
+                            "0cc175b9c0f1b6a831c399e269772661"),
+                    new ECSNode("testServer4", "127.0.0.1", 50001,
+                            "92eb5ffee6ae2fec3ad71c777531578f"),
+                    new ECSNode("testServer2", "127.0.0.1", 50003,
+                            "4a8a08f09d37b73795649038408b5f33"),
+                    new ECSNode("testServer3", "127.0.0.1", 50004,
+                            "8277e0910d750195b448797616e091ad"))));
+            Thread.sleep(1000);
+
+            connection = new ServerConnection(new Protocol(),
+                    new KVMessageSerializer(), "127.0.0.1", 50001);
+            connection.connect();
+
+            int id = connection.sendRequest("b", "5",
+                    KVMessage.StatusType.PUT);
+            KVMessage message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.PUT_SUCCESS,
+                    message.getStatus());
+
+            connection = new ServerConnection(new Protocol(),
+                    new KVMessageSerializer(), "127.0.0.1", 50002);
+            connection.connect();
+
+            id = connection.sendRequest("b", null,
+                    KVMessage.StatusType.GET);
+            message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.GET_ERROR,
+                    message.getStatus());
+
+            assertEquals(true, server.getReplicator()
+                    .fullReplication("8277e0910d750195b448797616e091ad",
+                            "92eb5ffee6ae2fec3ad71c777531578f", connection));
+
+            id = connection.sendRequest("b", null,
+                    KVMessage.StatusType.GET);
+            message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    message.getStatus());
+
+        } finally {
+            if (connection != null) {
+                connection.disconnect(true);
+            }
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
 }
