@@ -771,18 +771,12 @@ public class ECSController implements ZooKeeperListener {
 
     @Override
     public void handleZooKeeperEvent(WatchedEvent event) {
-        lock.lock();
-        try {
-            if (event
-                    .getType() == Watcher.Event.EventType.NodeChildrenChanged) {
-                try {
-                    onZooKeeperChildrenChanged(getZooKeeperChildren(true));
-                } catch (Exception e) {
-                    logger.error("Failed to watch ZooKeeper node", e);
-                }
+        if (event.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
+            try {
+                onZooKeeperChildrenChanged(getZooKeeperChildren(true));
+            } catch (Exception e) {
+                logger.error("Failed to watch ZooKeeper node", e);
             }
-        } finally {
-            lock.unlock();
         }
     }
 
@@ -809,18 +803,24 @@ public class ECSController implements ZooKeeperListener {
             }
         }
 
-        int numProblemNode = removeProblemNode(children);
-        if (numProblemNode != 0) {
-            Metadata newMetadata = computeMetadata();
+        new Thread(() -> {
+            lock.lock();
             try {
-                updateActiveNodesMetadata(newMetadata);
-            } catch (NodeCommandException e) {
-                logger.error("Unable to update metadata on all nodes");
+                int numProblemNode = removeProblemNode(children);
+                if (numProblemNode != 0) {
+                    Metadata newMetadata = computeMetadata();
+                    try {
+                        updateActiveNodesMetadata(newMetadata);
+                    } catch (NodeCommandException e) {
+                        logger.error("Unable to update metadata on all nodes");
+                    }
+                    addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
+                            DEFAULT_CACHE_SIZE);
+                }
+            } finally {
+                lock.unlock();
             }
-            addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
-                    DEFAULT_CACHE_SIZE);
-        }
-
+        }).start();
     }
 
     private int removeProblemNode(List<String> children) {

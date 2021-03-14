@@ -234,6 +234,7 @@ public class Replicator extends Thread {
                         }
                         if (!state.connection.isConnectionValid()) {
                             // Skip this replica
+                            // Fall-back to full replication next time
                             state.reset();
                             break;
                         }
@@ -249,8 +250,8 @@ public class Replicator extends Thread {
                             }
                         } else {
                             // Skip this replica
-                            // We can re-try this, since incremental replication
-                            // is idempotent
+                            // Fall-back to full replication next time
+                            state.reset();
                             break;
                         }
                     }
@@ -311,6 +312,8 @@ public class Replicator extends Thread {
     private boolean fullReplication(String rangeStart,
                                     String rangeEnd,
                                     ServerConnection targetConnection) {
+        logger.info(String.format("Performing full replication to %s:%d",
+                targetConnection.getAddress(), targetConnection.getPort()));
         return deleteReplicaData(rangeStart, rangeEnd,
                 targetConnection) && copyDataTo(rangeStart, rangeEnd,
                 targetConnection);
@@ -318,6 +321,10 @@ public class Replicator extends Thread {
 
     private boolean incrementalReplication(KVStorageDelta delta,
                                            ServerConnection targetConnection) {
+        logger.info(String.format(
+                "Performing incremental replication (%d entries) to %s:%d",
+                delta.getEntryCount(), targetConnection.getAddress(),
+                targetConnection.getPort()));
         for (Map.Entry<String, Value> entry : delta.getEntrySet()) {
             if (!enabled.get()) {
                 logger.info("Incremental replication interrupted");
