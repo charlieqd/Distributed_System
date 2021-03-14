@@ -280,9 +280,23 @@ public class Replicator extends Thread {
                 }
                 server.unlockSelfWrite();
             }
+            int minimalTime = -1;
+            boolean found = false;
+            for (Replicator.ReplicaState r : replicaStates) {
+                if (!found || r.getLastSyncLogicalTime() < minimalTime) {
+                    found = true;
+                    minimalTime = r.getLastSyncLogicalTime();
+                }
+            }
 
-            // TODO: remove deltas that will never be used, maybe at start?
-            throw new Error("Not implemented");
+            Set<KVStorageDelta> removedList = new HashSet<KVStorageDelta>();
+            for (KVStorageDelta d : deltas) {
+                if (d.getLogicalTime() < minimalTime) {
+                    removedList.add(d);
+                }
+            }
+
+            deltas.removeAll(removedList);
         } finally {
             replicating.set(false);
         }
