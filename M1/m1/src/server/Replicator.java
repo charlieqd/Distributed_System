@@ -279,7 +279,6 @@ public class Replicator extends Thread {
                 }
                 server.unlockSelfWrite();
             }
-            
             int minimalTime = -1;
             boolean found = false;
             for (Replicator.ReplicaState r : replicaStates) {
