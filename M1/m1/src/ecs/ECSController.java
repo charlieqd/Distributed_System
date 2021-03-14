@@ -74,6 +74,7 @@ public class ECSController implements ZooKeeperListener {
                          String configPath,
                          ZooKeeperService zooKeeperService) throws
             Exception {
+        lock = new ReentrantLock();
         nodes = readConfig(configPath);
         System.out.printf("%d servers found.\n", nodes.size());
         nodeStates = new HashMap<>();
@@ -100,8 +101,6 @@ public class ECSController implements ZooKeeperListener {
             logger.error("Failed to watch ZooKeeper node", e);
             throw e;
         }
-
-        lock = new ReentrantLock();
     }
 
     public ECSNode addNode(String cacheStrategy, int cacheSize) {
