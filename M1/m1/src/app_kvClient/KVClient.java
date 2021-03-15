@@ -8,6 +8,7 @@ import client.KVStoreListener;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import shared.Metadata;
 import shared.Util;
 import shared.messages.KVMessage;
 import shared.messages.KVMessageImpl;
@@ -121,6 +122,14 @@ public class KVClient implements IKVClient, KVStoreListener {
                 printError("Invalid number of parameters!");
             }
 
+        } else if (tokens[0].equals("hash")) {
+            if (tokens.length == 2) {
+                String key = tokens[1];
+                System.out.println(Metadata.getRingPosition(key));
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
         } else if (tokens[0].equals("put")) {
             if (tokens.length == 3 || tokens.length == 2) {
                 if (connectionValid()) {
@@ -170,14 +179,16 @@ public class KVClient implements IKVClient, KVStoreListener {
         if (key != null &&
                 key.length() > KVMessageImpl.MAX_KEY_LENGTH) {
             printError(
-                    "Key too large; max length " + KVMessageImpl.MAX_KEY_LENGTH);
+                    "Key too large; max length " +
+                            KVMessageImpl.MAX_KEY_LENGTH);
             return;
         }
 
         if (value != null &&
                 value.length() > KVMessageImpl.MAX_VALUE_LENGTH) {
             printError(
-                    "Value too large; max length " + KVMessageImpl.MAX_VALUE_LENGTH);
+                    "Value too large; max length " +
+                            KVMessageImpl.MAX_VALUE_LENGTH);
             return;
         }
 
@@ -195,7 +206,8 @@ public class KVClient implements IKVClient, KVStoreListener {
         if (key != null &&
                 key.length() > KVMessageImpl.MAX_KEY_LENGTH) {
             printError(
-                    "Key too large; max length " + KVMessageImpl.MAX_KEY_LENGTH);
+                    "Key too large; max length " +
+                            KVMessageImpl.MAX_KEY_LENGTH);
             return;
         }
 
@@ -263,6 +275,8 @@ public class KVClient implements IKVClient, KVStoreListener {
         sb.append("\t\t\t ");
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
 
+        sb.append("hash <key>");
+        sb.append("\t\t display the hash value of the key for debug \n");
         sb.append("quit ");
         sb.append("\t\t\t exits the program");
         System.out.println(sb.toString());
