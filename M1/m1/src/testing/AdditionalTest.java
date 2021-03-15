@@ -394,6 +394,8 @@ public class AdditionalTest {
     public void testKVServerReplica() throws Exception {
         KVServer server = null;
         ServerConnection connection = null;
+        KVServer server1 = null;
+        ServerConnection connection1 = null;
         try {
             String rootPath = folder.newFolder().toString();
             server = new KVServer(
@@ -409,14 +411,27 @@ public class AdditionalTest {
                             "92eb5ffee6ae2fec3ad71c777531578f"))));
             Thread.sleep(1000);
 
-            connection = new ServerConnection(new Protocol(),
+            server1 = new KVServer(
+                    new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+                            1024, IKVServer.CacheStrategy.LRU), new Protocol(),
+                    new KVMessageSerializer(), 50002, "testServer2", null);
+            server1.start();
+            server1.startServing();
+            server1.updateMetadata(new Metadata(Arrays.asList(
+                    new ECSNode("testServer2", "127.0.0.1", 50002,
+                            "0cc175b9c0f1b6a831c399e269772661"),
+                    new ECSNode("testServer", "127.0.0.1", 50001,
+                            "92eb5ffee6ae2fec3ad71c777531578f"))));
+            Thread.sleep(1000);
+
+            connection1 = new ServerConnection(new Protocol(),
                     new KVMessageSerializer(), "127.0.0.1", 50001);
-            connection.connect();
+            connection1.connect();
 
             int id = connection.sendRequest("a", null,
                     KVMessage.StatusType.GET);
             KVMessage message = connection.receiveMessage(id);
-            assertEquals(KVMessage.StatusType.NOT_RESPONSIBLE,
+            assertNotEquals(KVMessage.StatusType.NOT_RESPONSIBLE,
                     message.getStatus());
 
             id = connection.sendRequest("b", null,
@@ -424,10 +439,6 @@ public class AdditionalTest {
             message = connection.receiveMessage(id);
             assertEquals(KVMessage.StatusType.GET_ERROR, message.getStatus());
 
-            id = connection.sendRequest("c", null,
-                    KVMessage.StatusType.GET);
-            message = connection.receiveMessage(id);
-            assertEquals(KVMessage.StatusType.GET_ERROR, message.getStatus());
         } finally {
             if (connection != null) {
                 connection.disconnect(true);
