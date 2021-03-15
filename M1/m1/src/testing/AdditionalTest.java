@@ -351,7 +351,7 @@ public class AdditionalTest {
             server.start();
             server.startServing();
             server.updateMetadata(new Metadata(Arrays.asList(
-                    new ECSNode("testServer2", "127.0.0.1", 50002,
+                    new ECSNode("testServer1", "127.0.0.1", 50002,
                             "0cc175b9c0f1b6a831c399e269772661"),
                     new ECSNode("testServer4", "127.0.0.1", 50001,
                             "92eb5ffee6ae2fec3ad71c777531578f"),
@@ -541,6 +541,66 @@ public class AdditionalTest {
                     KVMessage.StatusType.PUT);
             message = connection.receiveMessage(id);
             assertEquals(KVMessage.StatusType.SERVER_STOPPED,
+                    message.getStatus());
+        } finally {
+            if (connection != null) {
+                connection.disconnect(true);
+            }
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
+
+    @Test
+    public void testKVServerSelfWriteLock() throws Exception {
+        KVServer server = null;
+        ServerConnection connection = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            server = new KVServer(
+                    new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+                            1024, IKVServer.CacheStrategy.LRU), new Protocol(),
+                    new KVMessageSerializer(), 50001, "testServer", null);
+            server.start();
+            server.startServing();
+            server.updateMetadata(new Metadata(
+                    Arrays.asList(
+                            new ECSNode("testServer", "127.0.0.1", 50001))));
+            Thread.sleep(1000);
+
+            connection = new ServerConnection(new Protocol(),
+                    new KVMessageSerializer(), "127.0.0.1", 50001);
+            connection.connect();
+
+            int id = connection.sendRequest("a", "0",
+                    KVMessage.StatusType.PUT);
+            KVMessage message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.PUT_SUCCESS,
+                    message.getStatus());
+
+            server.lockSelfWrite();
+
+            id = connection.sendRequest("a", "1",
+                    KVMessage.StatusType.PUT);
+            message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.SERVER_WRITE_LOCK,
+                    message.getStatus());
+
+            server.unlockWrite();
+
+            id = connection.sendRequest("a", "2",
+                    KVMessage.StatusType.PUT);
+            message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.SERVER_WRITE_LOCK,
+                    message.getStatus());
+
+            server.unlockSelfWrite();
+
+            id = connection.sendRequest("a", "2",
+                    KVMessage.StatusType.PUT);
+            message = connection.receiveMessage(id);
+            assertEquals(KVMessage.StatusType.PUT_UPDATE,
                     message.getStatus());
         } finally {
             if (connection != null) {
