@@ -608,6 +608,9 @@ public class ECSController implements ZooKeeperListener {
                     inactiveNodes.add(node);
                 }
             }
+            // Print in hash ring order
+            Collections.sort(activeNodes);
+            Collections.sort(inactiveNodes);
             System.out.println("Active nodes:");
             for (ECSNode node : activeNodes) {
                 printNode(node);
@@ -772,7 +775,7 @@ public class ECSController implements ZooKeeperListener {
         try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             String line;
             while ((line = br.readLine()) != null) {
-                String[] tokens = line.split(" ");
+                String[] tokens = line.split("\\s+");
                 if (tokens.length == 3) {
                     ECSNode server = new ECSNode(tokens[0], tokens[1],
                             Integer.parseInt(tokens[2]));
@@ -857,8 +860,25 @@ public class ECSController implements ZooKeeperListener {
                             logger.error(
                                     "Unable to update metadata on all nodes");
                         }
-                        addNodes(numProblemNode, DEFAULT_CACHE_STRATEGY,
-                                DEFAULT_CACHE_SIZE);
+                        List<ECSNode> addedNodes = addNodes(numProblemNode,
+                                DEFAULT_CACHE_STRATEGY, DEFAULT_CACHE_SIZE);
+                        for (ECSNode node : addedNodes) {
+                            logger.warn("Replacement nodes added:");
+                            logger.warn(String.format(
+                                    "- name: %s, address: %s, port: %d\n",
+                                    node.getNodeName(), node.getNodeHost(),
+                                    node.getNodePort()));
+                        }
+                        try {
+                            sendCommandToNodes(
+                                    new KVMessageImpl(null, null, null,
+                                            KVMessage.StatusType.ECS_START_SERVING),
+                                    addedNodes);
+                        } catch (NodeCommandException e) {
+                            logger.error(
+                                    "Failed to start serving of replacement nodes",
+                                    e);
+                        }
                     }
                 } finally {
                     lock.unlock();
