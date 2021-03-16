@@ -57,16 +57,19 @@ public class KVStorageDelta {
     public void put(String key, String value) {
         String keyHash = Metadata.getRingPosition(key);
         boolean isResponsible = false;
-        if (hashRangeStart.compareTo(hashRangeEnd) > 0) {
+        int comp = hashRangeStart.compareTo(hashRangeEnd);
+        if (comp > 0) {
             if (keyHash.compareTo(hashRangeStart) > 0 || keyHash
                     .compareTo(hashRangeEnd) <= 0) {
                 isResponsible = true;
             }
-        } else {
+        } else if (comp < 0) {
             if (keyHash.compareTo(hashRangeStart) > 0 && keyHash
                     .compareTo(hashRangeEnd) <= 0) {
                 isResponsible = true;
             }
+        } else { // Hash range start and end are equal
+            isResponsible = true;
         }
         if (!isResponsible) {
             return;

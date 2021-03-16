@@ -15,3 +15,6 @@
 1. Run `ant`.
 2. Java jar files will be build under this directory. Make sure to run them with
    the current directory set to this directory.
+3. To start clients from another device (on the same local network), you must
+   first modify the `ecs.config` file to contain the local IP address of the
+   device hosting the ECS/server.

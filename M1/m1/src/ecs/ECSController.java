@@ -775,7 +775,7 @@ public class ECSController implements ZooKeeperListener {
         try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             String line;
             while ((line = br.readLine()) != null) {
-                String[] tokens = line.split(" ");
+                String[] tokens = line.split("\\s+");
                 if (tokens.length == 3) {
                     ECSNode server = new ECSNode(tokens[0], tokens[1],
                             Integer.parseInt(tokens[2]));
