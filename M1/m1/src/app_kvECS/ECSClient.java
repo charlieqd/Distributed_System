@@ -21,7 +21,7 @@ public class ECSClient {
 
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECS Client> ";
-    
+
     private final InputStream input;
     private BufferedReader stdin;
     private boolean stop = false;
@@ -83,6 +83,8 @@ public class ECSClient {
         } else if (tokens[0].equals("addnodes")) {
             List<ECSNode> nodes = null;
 
+            long startMs = getTimeMs();
+
             if (tokens.length == 2) {
                 System.out.println("Adding nodes...");
                 try {
@@ -110,6 +112,7 @@ public class ECSClient {
             }
 
             if (nodes != null) {
+                long endMs = getTimeMs();
                 System.out.println("Nodes added:");
                 for (ECSNode node : nodes) {
                     System.out
@@ -117,6 +120,8 @@ public class ECSClient {
                                     node.getNodeName(), node.getNodeHost(),
                                     node.getNodePort());
                 }
+                logger.info(String.format("Time used: %f seconds",
+                        ((double) (endMs - startMs)) / 1000.0));
             }
 
         } else if (tokens[0].equals("logLevel")) {
@@ -133,6 +138,8 @@ public class ECSClient {
             }
 
         } else if (tokens[0].equals("addnode")) {
+            long startMs = getTimeMs();
+
             ECSNode node = null;
             if (tokens.length == 1) {
                 System.out.println("Adding node...");
@@ -153,17 +160,24 @@ public class ECSClient {
             }
 
             if (node != null) {
+                long endMs = getTimeMs();
                 System.out
                         .printf("Node added: name: %s, address: %s, port: %d\n",
                                 node.getNodeName(), node.getNodeHost(),
                                 node.getNodePort());
+                logger.info(String.format("Time used: %f seconds",
+                        ((double) (endMs - startMs)) / 1000.0));
             }
 
         } else if (tokens[0].equals("removenode")) {
+            long startMs = getTimeMs();
             if (tokens.length == 2) {
                 System.out.println("Removing node...");
                 String nodeName = tokens[1];
                 controller.removeNode(nodeName);
+                long endMs = getTimeMs();
+                logger.info(String.format("Time used: %f seconds",
+                        ((double) (endMs - startMs)) / 1000.0));
             } else {
                 printError("Invalid number of parameters!");
             }
@@ -260,5 +274,9 @@ public class ECSClient {
         ECSClient ecsApp = new ECSClient(protocol, messageSerializer, System.in,
                 configPath, zooKeeperService);
         ecsApp.run();
+    }
+
+    private static long getTimeMs() {
+        return System.currentTimeMillis();
     }
 }
