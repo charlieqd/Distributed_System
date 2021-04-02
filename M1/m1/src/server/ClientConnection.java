@@ -492,6 +492,7 @@ public class ClientConnection implements Runnable {
             case TRANSACTION_COMMIT: {
 
                 try {
+                    boolean successful = true;
                     for (Map.Entry<String, KVStorageDelta.Value> entry : transactionBuffer
                             .getEntrySet()) {
 
@@ -506,6 +507,7 @@ public class ClientConnection implements Runnable {
                                     "Internal server error: " +
                                             Util.getStackTraceString(e),
                                     KVMessage.StatusType.FAILED);
+                            successful = false;
                             break;
                         }
 
@@ -513,19 +515,27 @@ public class ClientConnection implements Runnable {
                             responseMessage = new KVMessageImpl(null,
                                     "Internal server error",
                                     KVMessage.StatusType.FAILED);
+                            successful = false;
                             break;
                         }
                     }
 
+
+                    inTransaction = false;
                     transactionBuffer.clear();
                     server.unlockKeys(transactionBuffer.getAllKeys());
 
-                    responseMessage = new KVMessageImpl(null, null,
-                            KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    if (successful) {
+                        responseMessage = new KVMessageImpl(null, null,
+                                KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    }
+
+                    break;
                 } catch (Exception e) {
                     responseMessage = new KVMessageImpl(null,
                             "Internal server error",
                             KVMessage.StatusType.FAILED);
+                    break;
                 }
             }
 
@@ -537,10 +547,12 @@ public class ClientConnection implements Runnable {
 
                     responseMessage = new KVMessageImpl(null, null,
                             KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    break;
                 } catch (Exception e) {
                     responseMessage = new KVMessageImpl(null,
                             "Internal server error",
                             KVMessage.StatusType.FAILED);
+                    break;
                 }
             }
 
