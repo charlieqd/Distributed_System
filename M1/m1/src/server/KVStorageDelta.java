@@ -97,10 +97,16 @@ public class KVStorageDelta {
     }
 
     /**
-     * Clear the values
+     * Clear values
      */
     public void clear(){
         values.clear();
     }
 
+    /**
+     * Return all keys in values
+     */
+    public Set<String> getAllKeys(){
+        return values.keySet();
+    }
 }
