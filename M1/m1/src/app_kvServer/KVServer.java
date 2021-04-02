@@ -158,6 +158,15 @@ public class KVServer extends Thread implements IKVServer {
         }
     }
 
+    public boolean unlockKeys(Set keys) {
+        lock.lock();
+        try {
+            return lockedKeys.removeAll(keys);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public boolean isRunning() {
         return this.running.get();
     }

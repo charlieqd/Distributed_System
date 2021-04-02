@@ -119,6 +119,14 @@ public interface KVMessage {
          */
         TRANSACTION_SUCCESS,
         /**
+         * Transaction: commit transaction
+         */
+        TRANSACTION_COMMIT,
+        /**
+         * Transaction: rollback transaction
+         */
+        TRANSACTION_ROLLBACK,
+        /**
          * Any other error
          */
         FAILED

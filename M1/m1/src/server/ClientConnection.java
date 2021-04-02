@@ -1,7 +1,6 @@
 package server;
 
 import app_kvServer.KVServer;
-import client.ServerConnection;
 import ecs.MoveDataArgs;
 import org.apache.log4j.Logger;
 import shared.*;
@@ -12,7 +11,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
 
 
@@ -37,6 +37,11 @@ public class ClientConnection implements Runnable {
 
     private KVServer server;
 
+    private static final HashSet<KVMessage.StatusType> PUT_SUCCESS_STATUS = new HashSet<>(
+            Arrays.asList(KVMessage.StatusType.PUT_SUCCESS,
+                    KVMessage.StatusType.DELETE_SUCCESS,
+                    KVMessage.StatusType.PUT_UPDATE));
+
     /**
      * Constructs a new CientConnection object for a given TCP socket.
      *
@@ -54,6 +59,7 @@ public class ClientConnection implements Runnable {
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
         this.inTransaction = false;
+        this.transactionBuffer = new KVStorageDelta(0, "0", "0");
     }
 
     /**
@@ -224,7 +230,7 @@ public class ClientConnection implements Runnable {
                     responseMessage = handleNotResponsible();
                 } else {
                     String value;
-                    if(inTransaction){
+                    if (inTransaction) {
                         value = transactionBuffer.
                     }
                     try {
@@ -272,7 +278,7 @@ public class ClientConnection implements Runnable {
                     String value = requestMessage.getValue();
 
                     KVMessage.StatusType putResponseType;
-                    if(!inTransaction){
+                    if (!inTransaction) {
                         try {
                             putResponseType = storage.put(key, value);
                         } catch (IOException e) {
@@ -282,14 +288,13 @@ public class ClientConnection implements Runnable {
                                     KVMessage.StatusType.FAILED);
                             break;
                         }
-                    }
-                    else{
-                        if(this.server.isKeyLock(key)){
+                    } else {
+                        if (this.server.isKeyLock(key)) {
                             putResponseType = KVMessage.StatusType.SERVER_WRITE_LOCK;
-                        }else{
+                        } else {
+                            server.addLockedKey(key);
                             transactionBuffer.put(key, value);
                             putResponseType = KVMessage.StatusType.TRANSACTION_SUCCESS;
-                            // add key to the server lock key hashset
                         }
                     }
 
@@ -452,7 +457,7 @@ public class ClientConnection implements Runnable {
                 break;
             }
 
-            case TRANSACTION_BEGIN:{
+            case TRANSACTION_BEGIN: {
                 try {
                     this.inTransaction = true;
                     responseMessage = new KVMessageImpl(null, null,
@@ -464,6 +469,61 @@ public class ClientConnection implements Runnable {
                             KVMessage.StatusType.FAILED);
                 }
                 break;
+            }
+
+            case TRANSACTION_COMMIT: {
+
+                try {
+                    for (Map.Entry<String, KVStorageDelta.Value> entry : transactionBuffer
+                            .getEntrySet()) {
+
+                        String key = entry.getKey();
+                        KVStorageDelta.Value value = entry.getValue();
+                        KVMessage.StatusType putResponseType;
+                        try {
+                            putResponseType = storage
+                                    .put(key, value.get());
+                        } catch (IOException e) {
+                            responseMessage = new KVMessageImpl(null,
+                                    "Internal server error: " +
+                                            Util.getStackTraceString(e),
+                                    KVMessage.StatusType.FAILED);
+                            break;
+                        }
+
+                        if (!PUT_SUCCESS_STATUS.contains(putResponseType)) {
+                            responseMessage = new KVMessageImpl(null,
+                                    "Internal server error",
+                                    KVMessage.StatusType.FAILED);
+                            break;
+                        }
+                    }
+
+                    transactionBuffer.clear();
+                    server.unlockKeys(transactionBuffer.getAllKeys());
+
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.TRANSACTION_SUCCESS);
+                } catch (Exception e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error",
+                            KVMessage.StatusType.FAILED);
+                }
+            }
+
+            case TRANSACTION_ROLLBACK: {
+
+                try {
+                    transactionBuffer.clear();
+                    server.unlockKeys(transactionBuffer.getAllKeys());
+
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.TRANSACTION_SUCCESS);
+                } catch (Exception e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Internal server error",
+                            KVMessage.StatusType.FAILED);
+                }
             }
 
             default: {
