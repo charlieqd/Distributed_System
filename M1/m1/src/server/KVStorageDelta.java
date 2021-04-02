@@ -86,10 +86,14 @@ public class KVStorageDelta {
     }
 
     /**
-     * Record a get operation. return
+     * Record a get operation. return null if not exist
      */
     public String get(String key){
         // not finished, return ? if not exsit
-        return values.get(key).get();
+        if(values.containsKey(key)){
+            return values.get(key).get();
+        }
+        return null;
     }
+
 }

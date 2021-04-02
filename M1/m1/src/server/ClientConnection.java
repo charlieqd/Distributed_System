@@ -225,7 +225,20 @@ public class ClientConnection implements Runnable {
                 } else {
                     String value;
                     if(inTransaction){
-                        value = transactionBuffer.
+                        if(this.server.isKeyLock(key)){
+                            responseMessage = new KVMessageImpl(null,
+                                    "Transaction key lock error: ",
+                                    KVMessage.StatusType.ECS_LOCK_WRITE);
+                            break;
+                        }
+                        // add key to server lock key hashset
+                        this.server.addKeyLock(key);
+                        value = transactionBuffer.get(key);
+                        if(value != null){
+                            responseMessage = new KVMessageImpl(key, value,
+                                    KVMessage.StatusType.TRANSACTION_SUCCESS);
+                            break;
+                        }
                     }
                     try {
                         value = storage.get(key);
@@ -240,8 +253,13 @@ public class ClientConnection implements Runnable {
                         responseMessage = new KVMessageImpl(key, null,
                                 KVMessage.StatusType.GET_ERROR);
                     } else {
-                        responseMessage = new KVMessageImpl(key, value,
-                                KVMessage.StatusType.GET_SUCCESS);
+                        if(inTransaction){
+                            responseMessage = new KVMessageImpl(key, value,
+                                    KVMessage.StatusType.TRANSACTION_SUCCESS);
+                        }else{
+                            responseMessage = new KVMessageImpl(key, value,
+                                    KVMessage.StatusType.GET_SUCCESS);
+                        }
                     }
                     break;
                 }
