@@ -19,6 +19,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -59,7 +60,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
 
-    private HashSet<String> lockedKeys = new HashSet<>();
+    private HashMap<String, ClientConnection> lockedKeys = new HashMap<>();
 
     private final Replicator replicator;
 
@@ -140,28 +141,35 @@ public class KVServer extends Thread implements IKVServer {
         logger.info("Server stopped.");
     }
 
-    public void addLockedKey(String key) {
+    public void addLockedKey(String key, ClientConnection client) {
         lock.lock();
         try {
-            lockedKeys.add(key);
+            lockedKeys.put(key, client);
         } finally {
             lock.unlock();
         }
     }
 
-    public boolean isKeyLock(String key) {
+    public boolean isKeyLock(String key, ClientConnection client) {
         lock.lock();
         try {
-            return lockedKeys.contains(key);
+            ClientConnection value = lockedKeys.get(key);
+            if (value == null || value == client) {
+                return false;
+            } else {
+                return true;
+            }
         } finally {
             lock.unlock();
         }
     }
 
-    public boolean unlockKeys(Set keys) {
+    public void unlockKeys(Set keys, ClientConnection client) {
         lock.lock();
         try {
-            return lockedKeys.removeAll(keys);
+            for (Object k : keys) {
+                lockedKeys.remove(k, client);
+            }
         } finally {
             lock.unlock();
         }

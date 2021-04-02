@@ -525,7 +525,7 @@ public class ClientConnection implements Runnable {
 
                     inTransaction = false;
                     transactionBuffer.clear();
-                    server.unlockKeys(transactionBuffer.getAllKeys());
+                    server.unlockKeys(transactionBuffer.getAllKeys(), this);
 
                     if (successful) {
                         responseMessage = new KVMessageImpl(null, null,
@@ -545,7 +545,7 @@ public class ClientConnection implements Runnable {
 
                 try {
                     transactionBuffer.clear();
-                    server.unlockKeys(transactionBuffer.getAllKeys());
+                    server.unlockKeys(transactionBuffer.getAllKeys(), this);
 
                     responseMessage = new KVMessageImpl(null, null,
                             KVMessage.StatusType.TRANSACTION_SUCCESS);
