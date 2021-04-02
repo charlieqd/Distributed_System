@@ -238,7 +238,7 @@ public class ClientConnection implements Runnable {
                             break;
                         }
                         // add key to server lock key hashset
-                        this.server.addLockedKey(key);
+                        this.server.addLockedKey(key, this);
                         value = transactionBuffer.get(key);
                         if (value != null) {
                             responseMessage = new KVMessageImpl(key, value,
@@ -313,7 +313,7 @@ public class ClientConnection implements Runnable {
                             break;
                         }
                     } else {
-                        server.addLockedKey(key);
+                        server.addLockedKey(key, this);
                         transactionBuffer.put(key, value);
                         putResponseType = KVMessage.StatusType.TRANSACTION_SUCCESS;
                     }
