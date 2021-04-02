@@ -111,6 +111,14 @@ public interface KVMessage {
          */
         ECS_STOP_REPLICATION,
         /**
+         * Transaction: Start Transaction
+         */
+        TRANSACTION_BEGIN,
+        /**
+         * Transaction: Operation Success
+         */
+        TRANSACTION_SUCCESS,
+        /**
          * Any other error
          */
         FAILED

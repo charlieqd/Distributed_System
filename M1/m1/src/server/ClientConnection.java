@@ -1,6 +1,7 @@
 package server;
 
 import app_kvServer.KVServer;
+import client.ServerConnection;
 import ecs.MoveDataArgs;
 import org.apache.log4j.Logger;
 import shared.*;
@@ -11,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -29,6 +32,8 @@ public class ClientConnection implements Runnable {
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
+    private boolean inTransaction;
+    private KVStorageDelta transactionBuffer = null;
 
     private KVServer server;
 
@@ -48,6 +53,7 @@ public class ClientConnection implements Runnable {
         this.storage = storage;
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
+        this.inTransaction = false;
     }
 
     /**
@@ -218,6 +224,9 @@ public class ClientConnection implements Runnable {
                     responseMessage = handleNotResponsible();
                 } else {
                     String value;
+                    if(inTransaction){
+                        value = transactionBuffer.
+                    }
                     try {
                         value = storage.get(key);
                     } catch (IOException e) {
@@ -263,14 +272,25 @@ public class ClientConnection implements Runnable {
                     String value = requestMessage.getValue();
 
                     KVMessage.StatusType putResponseType;
-                    try {
-                        putResponseType = storage.put(key, value);
-                    } catch (IOException e) {
-                        responseMessage = new KVMessageImpl(null,
-                                "Internal server error: " +
-                                        Util.getStackTraceString(e),
-                                KVMessage.StatusType.FAILED);
-                        break;
+                    if(!inTransaction){
+                        try {
+                            putResponseType = storage.put(key, value);
+                        } catch (IOException e) {
+                            responseMessage = new KVMessageImpl(null,
+                                    "Internal server error: " +
+                                            Util.getStackTraceString(e),
+                                    KVMessage.StatusType.FAILED);
+                            break;
+                        }
+                    }
+                    else{
+                        if(this.server.isKeyLock(key)){
+                            putResponseType = KVMessage.StatusType.SERVER_WRITE_LOCK;
+                        }else{
+                            transactionBuffer.put(key, value);
+                            putResponseType = KVMessage.StatusType.TRANSACTION_SUCCESS;
+                            // add key to the server lock key hashset
+                        }
                     }
 
                     responseMessage = new KVMessageImpl(key, value,
@@ -426,6 +446,20 @@ public class ClientConnection implements Runnable {
                 } catch (Exception e) {
                     responseMessage = new KVMessageImpl(null,
                             "Internal server error: " + Util
+                                    .getStackTraceString(e),
+                            KVMessage.StatusType.FAILED);
+                }
+                break;
+            }
+
+            case TRANSACTION_BEGIN:{
+                try {
+                    this.inTransaction = true;
+                    responseMessage = new KVMessageImpl(null, null,
+                            KVMessage.StatusType.TRANSACTION_SUCCESS);
+                } catch (Exception e) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Transaction begin error: " + Util
                                     .getStackTraceString(e),
                             KVMessage.StatusType.FAILED);
                 }
