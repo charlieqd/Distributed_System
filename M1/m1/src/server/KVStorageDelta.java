@@ -96,4 +96,11 @@ public class KVStorageDelta {
         return null;
     }
 
+    /**
+     * Clear the values
+     */
+    public void clear(){
+        values.clear();
+    }
+
 }
