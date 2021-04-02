@@ -84,4 +84,12 @@ public class KVStorageDelta {
     public Set<Map.Entry<String, Value>> getEntrySet() {
         return values.entrySet();
     }
+
+    /**
+     * Record a get operation. return
+     */
+    public String get(String key){
+        // not finished, return ? if not exsit
+        return values.get(key).get();
+    }
 }
