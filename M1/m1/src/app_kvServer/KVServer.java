@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer {
 
@@ -45,6 +47,8 @@ public class KVServer extends Thread implements IKVServer {
 
     private String name;
 
+    private final Lock lock;
+
     public final AtomicBoolean serving = new AtomicBoolean(false);
     public final AtomicBoolean writeLock = new AtomicBoolean(false);
 
@@ -54,6 +58,8 @@ public class KVServer extends Thread implements IKVServer {
             null);
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
+
+    private HashSet<String> lockedKeys = new HashSet<>();
 
     private final Replicator replicator;
 
@@ -69,6 +75,7 @@ public class KVServer extends Thread implements IKVServer {
                     IProtocol protocol,
                     ISerializer<KVMessage> messageSerializer,
                     int port, String name, ZooKeeperService zooKeeperService) {
+        this.lock = new ReentrantLock();
         this.name = name;
         this.storage = storage;
         this.protocol = protocol;
@@ -76,7 +83,8 @@ public class KVServer extends Thread implements IKVServer {
         this.port = port;
         this.zooKeeperService = zooKeeperService;
 
-        this.replicator = new Replicator(protocol, messageSerializer, this,
+        this.replicator = new Replicator(protocol, messageSerializer,
+                this,
                 storage);
         this.replicator.start();
     }
@@ -130,6 +138,24 @@ public class KVServer extends Thread implements IKVServer {
         }
         running.set(false);
         logger.info("Server stopped.");
+    }
+
+    public void addLockedKey(String key) {
+        lock.lock();
+        try {
+            lockedKeys.add(key);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean isKeyLock(String key) {
+        lock.lock();
+        try {
+            return lockedKeys.contains(key);
+        } finally {
+            lock.unlock();
+        }
     }
 
     public boolean isRunning() {
