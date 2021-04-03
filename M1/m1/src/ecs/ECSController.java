@@ -303,7 +303,6 @@ public class ECSController implements ZooKeeperListener {
                 updateActiveNodesMetadata(newMetadata);
             } catch (NodeCommandException e) {
                 logger.error("Unable to update metadata on all nodes");
-                return null;
             }
 
             // Release write lock and delete transferred data

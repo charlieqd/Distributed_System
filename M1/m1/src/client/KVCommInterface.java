@@ -40,4 +40,10 @@ public interface KVCommInterface {
      *                   to any KV server).
      */
     public KVMessage get(String key) throws Exception;
+
+    KVMessage transactionPut(String key, String value) throws Exception;
+
+    KVMessage transactionGet(String key) throws Exception;
+
+    public void runTransaction(TransactionRunner runner) throws Exception;
 }

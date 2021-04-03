@@ -129,6 +129,18 @@ public class KVMessageImpl implements KVMessage, Serializable {
                 return statusName;
             case ECS_STOP_REPLICATION:
                 return statusName;
+            case TRANSACTION_BEGIN:
+                return statusName;
+            case TRANSACTION_SUCCESS:
+                return statusName;
+            case TRANSACTION_COMMIT:
+                return statusName;
+            case TRANSACTION_ROLLBACK:
+                return statusName;
+            case TRANSACTION_GET:
+                return statusName + "<" + key + ">";
+            case TRANSACTION_PUT:
+                return statusName + "<" + key + "," + value + ">";
             case FAILED:
                 return statusName + "<" + value + ">";
         }

@@ -2,9 +2,7 @@ package app_kvClient;
 
 //import client.Client;
 
-import client.KVCommInterface;
-import client.KVStore;
-import client.KVStoreListener;
+import client.*;
 import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -155,6 +153,17 @@ public class KVClient implements IKVClient, KVStoreListener {
                 printError("Invalid number of parameters!");
             }
 
+        } else if (tokens[0].equals("transaction")) {
+            if (tokens.length == 1) {
+                if (connectionValid()) {
+                    beginTransaction();
+                } else {
+                    printError("Not connected or connection stopped!");
+                }
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
         } else if (tokens[0].equals("get")) {
             if (tokens.length == 2) {
                 if (connectionValid()) {
@@ -172,6 +181,25 @@ public class KVClient implements IKVClient, KVStoreListener {
         } else {
             printError("Unknown command");
             printHelp();
+        }
+    }
+
+    private void beginTransaction() {
+        TransactionInterpreter transaction = new TransactionInterpreter();
+        TransactionRunner runner = transaction.parse();
+        if (runner == null) {
+            printError("Failed to create transaction.");
+            return;
+        }
+        if (connectionValid()) {
+            try {
+                kvStore.runTransaction(runner);
+            } catch (Exception e) {
+                printError("Failed to execute transaction: " +
+                        Util.getStackTraceString(e));
+            }
+        } else {
+            printError("Not connected or connection stopped!");
         }
     }
 
@@ -267,6 +295,8 @@ public class KVClient implements IKVClient, KVStoreListener {
                 "\t insert or update a tuple. if value is not given, delete the tuple. \n");
         sb.append("delete <key>");
         sb.append("\t\t delete the tuple from the server \n");
+        sb.append("transaction");
+        sb.append("\t\t begin a transaction \n");
         sb.append("disconnect");
         sb.append("\t\t disconnects from the server \n");
 
