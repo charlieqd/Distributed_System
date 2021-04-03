@@ -127,6 +127,15 @@ public interface KVMessage {
          */
         TRANSACTION_ROLLBACK,
         /**
+         * Transaction: get
+         */
+        TRANSACTION_GET,
+        /**
+         * Transaction: put
+         */
+        TRANSACTION_PUT,
+
+        /**
          * Any other error
          */
         FAILED
