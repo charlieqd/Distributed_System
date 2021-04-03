@@ -231,7 +231,7 @@ public class ClientConnection implements Runnable {
                 } else {
                     String value;
                     if (inTransaction) {
-                        if (this.server.isKeyLock(key, this)) {
+                        if (this.server.isKeyLocked(key, this)) {
                             responseMessage = new KVMessageImpl(null,
                                     "Transaction key lock error: ",
                                     KVMessage.StatusType.ECS_LOCK_WRITE);
@@ -293,7 +293,7 @@ public class ClientConnection implements Runnable {
                 } else if (isClientPut && server.selfWriteLock.get()) {
                     responseMessage = handleWriteLocked();
                 } else {
-                    if (this.server.isKeyLock(key, this)) {
+                    if (this.server.isKeyLocked(key, this)) {
                         responseMessage = new KVMessageImpl(null,
                                 "Transaction key lock error: ",
                                 KVMessage.StatusType.ECS_LOCK_WRITE);
@@ -525,7 +525,7 @@ public class ClientConnection implements Runnable {
 
                     inTransaction = false;
                     transactionBuffer.clear();
-                    server.unlockKeys(transactionBuffer.getAllKeys(), this);
+                    server.unlockKeys(this);
 
                     if (successful) {
                         responseMessage = new KVMessageImpl(null, null,
@@ -544,8 +544,9 @@ public class ClientConnection implements Runnable {
             case TRANSACTION_ROLLBACK: {
 
                 try {
+                    inTransaction = false;
                     transactionBuffer.clear();
-                    server.unlockKeys(transactionBuffer.getAllKeys(), this);
+                    server.unlockKeys(this);
 
                     responseMessage = new KVMessageImpl(null, null,
                             KVMessage.StatusType.TRANSACTION_SUCCESS);
