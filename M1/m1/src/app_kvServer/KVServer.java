@@ -30,6 +30,16 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer {
 
+    private static class lockInfo {
+        public ClientConnection client;
+        public long time;
+
+        public lockInfo(ClientConnection client, long time) {
+            this.client = client;
+            this.time = time;
+        }
+    }
+
     private static Logger logger = Logger.getRootLogger();
     private static final String DEFAULT_CACHE_SIZE = "8192";
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
@@ -60,9 +70,11 @@ public class KVServer extends Thread implements IKVServer {
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
 
-    private HashMap<String, ClientConnection> lockedKeys = new HashMap<>();
+    private HashMap<String, lockInfo> lockedKeys = new HashMap<>();
 
     private final Replicator replicator;
+
+    private final TimeoutChecker timeoutChecker;
 
     /**
      * Start KV Server at given port
@@ -88,6 +100,9 @@ public class KVServer extends Thread implements IKVServer {
                 this,
                 storage);
         this.replicator.start();
+
+        this.timeoutChecker = new TimeoutChecker(this);
+        this.timeoutChecker.start();
     }
 
     public Replicator getReplicator() {
@@ -144,7 +159,8 @@ public class KVServer extends Thread implements IKVServer {
     public void addLockedKey(String key, ClientConnection client) {
         lock.lock();
         try {
-            lockedKeys.put(key, client);
+            lockedKeys
+                    .put(key, new lockInfo(client, System.currentTimeMillis()));
         } finally {
             lock.unlock();
         }
@@ -153,7 +169,7 @@ public class KVServer extends Thread implements IKVServer {
     public boolean isKeyLocked(String key, ClientConnection client) {
         lock.lock();
         try {
-            ClientConnection value = lockedKeys.get(key);
+            ClientConnection value = lockedKeys.get(key).client;
             if (value == null || value == client) {
                 return false;
             } else {
@@ -169,7 +185,24 @@ public class KVServer extends Thread implements IKVServer {
         try {
             Set<String> keys = lockedKeys.keySet();
             for (Object k : keys) {
-                lockedKeys.remove(k, client);
+                if (lockedKeys.get(k).client == client) {
+                    lockedKeys.remove(k);
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void checkLockTimeout(long timeoutPeriod) {
+        lock.lock();
+        try {
+            Set<String> keys = lockedKeys.keySet();
+            for (Object k : keys) {
+                if (System.currentTimeMillis() - lockedKeys
+                        .get(k).time > timeoutPeriod) {
+                    lockedKeys.remove(k);
+                }
             }
         } finally {
             lock.unlock();

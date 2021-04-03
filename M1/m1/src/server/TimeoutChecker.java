@@ -10,7 +10,9 @@ public class TimeoutChecker extends Thread {
     KVServer server;
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    private static final long ChECK_MILLIS = 5000;
+    private static final long ChECK_MILLIS = 2000;
+
+    private static final long TIMEOUT_PERIOD = 5000;
 
     private static Logger logger = Logger.getRootLogger();
 
@@ -20,8 +22,10 @@ public class TimeoutChecker extends Thread {
 
     @Override
     public void run() {
-        while (running.get()) {
-
+        while (server.isRunning()) {
+            if (server.serving.get()) {
+                server.checkLockTimeout(TIMEOUT_PERIOD);
+            }
         }
 
         try {
