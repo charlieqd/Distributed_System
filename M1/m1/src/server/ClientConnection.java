@@ -356,6 +356,7 @@ public class ClientConnection implements Runnable {
             }
 
             case TRANSACTION_PUT: {
+                logger.error("IN!");
                 if (!inTransaction.get()) {
                     responseMessage = new KVMessageImpl(null,
                             "Transaction put in normal mode",
@@ -381,7 +382,9 @@ public class ClientConnection implements Runnable {
                 } else if (isClientPut && server.selfWriteLock.get()) {
                     responseMessage = handleWriteLocked();
                 } else {
+                    logger.error("IN11");
                     if (this.server.isKeyLocked(key, this)) {
+                        logger.error("IN2");
                         responseMessage = new KVMessageImpl(null,
                                 "Transaction key lock error: ",
                                 KVMessage.StatusType.ECS_LOCK_WRITE);

@@ -169,8 +169,8 @@ public class KVServer extends Thread implements IKVServer {
     public boolean isKeyLocked(String key, ClientConnection client) {
         lock.lock();
         try {
-            ClientConnection value = lockedKeys.get(key).client;
-            if (value == null || value == client) {
+            if (lockedKeys.get(key) == null || lockedKeys
+                    .get(key).client == client) {
                 return false;
             } else {
                 return true;
