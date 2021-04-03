@@ -150,7 +150,7 @@ public class KVServer extends Thread implements IKVServer {
         }
     }
 
-    public boolean isKeyLock(String key, ClientConnection client) {
+    public boolean isKeyLocked(String key, ClientConnection client) {
         lock.lock();
         try {
             ClientConnection value = lockedKeys.get(key);
@@ -164,9 +164,10 @@ public class KVServer extends Thread implements IKVServer {
         }
     }
 
-    public void unlockKeys(Set keys, ClientConnection client) {
+    public void unlockKeys(ClientConnection client) {
         lock.lock();
         try {
+            Set<String> keys = lockedKeys.keySet();
             for (Object k : keys) {
                 lockedKeys.remove(k, client);
             }

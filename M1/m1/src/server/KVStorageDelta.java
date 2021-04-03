@@ -88,9 +88,8 @@ public class KVStorageDelta {
     /**
      * Record a get operation. return null if not exist
      */
-    public String get(String key){
-        // not finished, return ? if not exsit
-        if(values.containsKey(key)){
+    public String get(String key) {
+        if (values.containsKey(key)) {
             return values.get(key).get();
         }
         return null;
@@ -99,14 +98,7 @@ public class KVStorageDelta {
     /**
      * Clear values
      */
-    public void clear(){
+    public void clear() {
         values.clear();
-    }
-
-    /**
-     * Return all keys in values
-     */
-    public Set<String> getAllKeys(){
-        return values.keySet();
     }
 }

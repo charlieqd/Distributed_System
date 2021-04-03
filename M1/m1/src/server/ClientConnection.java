@@ -230,58 +230,21 @@ public class ClientConnection implements Runnable {
                     responseMessage = handleNotResponsible();
                 } else {
                     String value;
-                    try {
-                        value = storage.get(key);
-                    } catch (IOException e) {
-                        responseMessage = new KVMessageImpl(null,
-                                "Internal server error: " +
-                                        Util.getStackTraceString(e),
-                                KVMessage.StatusType.FAILED);
-                        break;
-                    }
-                    if (value == null) {
-                        responseMessage = new KVMessageImpl(key, null,
-                                KVMessage.StatusType.GET_ERROR);
-                    } else {
-                        responseMessage = new KVMessageImpl(key, value,
-                                KVMessage.StatusType.GET_SUCCESS);
-                    }
-                    break;
-                }
-                break;
-            }
-
-            case TRANSACTION_GET: {
-                if(!inTransaction){
-                    responseMessage = new KVMessageImpl(null, "Transaction get in not transaction mode",
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
-                String key = requestMessage.getKey();
-                if (key == null) {
-                    responseMessage = new KVMessageImpl(null, "Invalid key",
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
-                if (!server.serving.get()) {
-                    responseMessage = handleNotServing();
-                } else if (!isResponsibleForKeyRead(key)) {
-                    responseMessage = handleNotResponsible();
-                } else {
-                    String value;
-                    if (this.server.isKeyLock(key, this)) {
-                        responseMessage = new KVMessageImpl(null,
-                                "Transaction key lock error: ",
-                                KVMessage.StatusType.ECS_LOCK_WRITE);
-                        break;
-                    }
-                    // add key to server lock key hashset
-                    this.server.addLockedKey(key, this);
-                    value = transactionBuffer.get(key);
-                    if (value != null) {
-                        responseMessage = new KVMessageImpl(key, value,
-                                KVMessage.StatusType.GET_SUCCESS);
-                        break;
+                    if (inTransaction) {
+                        if (this.server.isKeyLocked(key, this)) {
+                            responseMessage = new KVMessageImpl(null,
+                                    "Transaction key lock error: ",
+                                    KVMessage.StatusType.ECS_LOCK_WRITE);
+                            break;
+                        }
+                        // add key to server lock key hashset
+                        this.server.addLockedKey(key, this);
+                        value = transactionBuffer.get(key);
+                        if (value != null) {
+                            responseMessage = new KVMessageImpl(key, value,
+                                    KVMessage.StatusType.TRANSACTION_SUCCESS);
+                            break;
+                        }
                     }
                     try {
                         value = storage.get(key);
@@ -296,8 +259,13 @@ public class ClientConnection implements Runnable {
                         responseMessage = new KVMessageImpl(key, null,
                                 KVMessage.StatusType.GET_ERROR);
                     } else {
-                        responseMessage = new KVMessageImpl(key, value,
-                                KVMessage.StatusType.GET_SUCCESS);
+                        if (inTransaction) {
+                            responseMessage = new KVMessageImpl(key, value,
+                                    KVMessage.StatusType.TRANSACTION_SUCCESS);
+                        } else {
+                            responseMessage = new KVMessageImpl(key, value,
+                                    KVMessage.StatusType.GET_SUCCESS);
+                        }
                     }
                     break;
                 }
@@ -325,7 +293,7 @@ public class ClientConnection implements Runnable {
                 } else if (isClientPut && server.selfWriteLock.get()) {
                     responseMessage = handleWriteLocked();
                 } else {
-                    if (this.server.isKeyLock(key, this)) {
+                    if (this.server.isKeyLocked(key, this)) {
                         responseMessage = new KVMessageImpl(null,
                                 "Transaction key lock error: ",
                                 KVMessage.StatusType.ECS_LOCK_WRITE);
@@ -334,60 +302,21 @@ public class ClientConnection implements Runnable {
                     String value = requestMessage.getValue();
                     KVMessage.StatusType putResponseType;
 
-                    try {
-                        putResponseType = storage.put(key, value);
-                    } catch (IOException e) {
-                        responseMessage = new KVMessageImpl(null,
-                                "Internal server error: " +
-                                        Util.getStackTraceString(e),
-                                KVMessage.StatusType.FAILED);
-                        break;
+                    if (!inTransaction) {
+                        try {
+                            putResponseType = storage.put(key, value);
+                        } catch (IOException e) {
+                            responseMessage = new KVMessageImpl(null,
+                                    "Internal server error: " +
+                                            Util.getStackTraceString(e),
+                                    KVMessage.StatusType.FAILED);
+                            break;
+                        }
+                    } else {
+                        server.addLockedKey(key, this);
+                        transactionBuffer.put(key, value);
+                        putResponseType = KVMessage.StatusType.TRANSACTION_SUCCESS;
                     }
-
-                    responseMessage = new KVMessageImpl(key, value,
-                            putResponseType);
-                }
-                break;
-            }
-
-            case TRANSACTION_PUT: {
-                if(!inTransaction){
-                    responseMessage = new KVMessageImpl(null, "Transaction put in not transaction mode",
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
-                String key = requestMessage.getKey();
-                if (key == null) {
-                    responseMessage = new KVMessageImpl(null, "Invalid key",
-                            KVMessage.StatusType.FAILED);
-                    break;
-                }
-
-                // An ECS_PUT will bypass all checks
-                boolean isClientPut = requestStatus == KVMessage.StatusType.PUT;
-
-                if (isClientPut && !server.serving.get()) {
-                    responseMessage = handleNotServing();
-                } else if (isClientPut && !isResponsibleForKeyWrite(key)) {
-                    responseMessage = handleNotResponsible();
-                } else if (isClientPut && server.writeLock.get()) {
-                    responseMessage = handleWriteLocked();
-                } else if (isClientPut && server.selfWriteLock.get()) {
-                    responseMessage = handleWriteLocked();
-                } else {
-                    if (this.server.isKeyLock(key, this)) {
-                        responseMessage = new KVMessageImpl(null,
-                                "Transaction key lock error: ",
-                                KVMessage.StatusType.ECS_LOCK_WRITE);
-                        break;
-                    }
-                    String value = requestMessage.getValue();
-                    KVMessage.StatusType putResponseType;
-
-
-                    server.addLockedKey(key, this);
-                    transactionBuffer.put(key, value);
-                    putResponseType = KVMessage.StatusType.PUT_SUCCESS;
 
                     responseMessage = new KVMessageImpl(key, value,
                             putResponseType);
@@ -596,7 +525,7 @@ public class ClientConnection implements Runnable {
 
                     inTransaction = false;
                     transactionBuffer.clear();
-                    server.unlockKeys(transactionBuffer.getAllKeys(), this);
+                    server.unlockKeys(this);
 
                     if (successful) {
                         responseMessage = new KVMessageImpl(null, null,
@@ -615,8 +544,9 @@ public class ClientConnection implements Runnable {
             case TRANSACTION_ROLLBACK: {
 
                 try {
+                    inTransaction = false;
                     transactionBuffer.clear();
-                    server.unlockKeys(transactionBuffer.getAllKeys(), this);
+                    server.unlockKeys(this);
 
                     responseMessage = new KVMessageImpl(null, null,
                             KVMessage.StatusType.TRANSACTION_SUCCESS);
