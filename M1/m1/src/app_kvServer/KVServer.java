@@ -201,6 +201,7 @@ public class KVServer extends Thread implements IKVServer {
             for (Object k : keys) {
                 if (System.currentTimeMillis() - lockedKeys
                         .get(k).time > timeoutPeriod) {
+                    lockedKeys.get(k).client.setInTransaction(false);
                     lockedKeys.remove(k);
                 }
             }

@@ -14,6 +14,7 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 /**
@@ -32,7 +33,12 @@ public class ClientConnection implements Runnable {
     private final IKVStorage storage;
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
-    private boolean inTransaction;
+
+    public void setInTransaction(boolean inTransaction) {
+        this.inTransaction.set(inTransaction);
+    }
+
+    private AtomicBoolean inTransaction = new AtomicBoolean(false);
     private KVStorageDelta transactionBuffer = null;
 
     private KVServer server;
@@ -58,7 +64,7 @@ public class ClientConnection implements Runnable {
         this.storage = storage;
         this.protocol = protocol;
         this.messageSerializer = messageSerializer;
-        this.inTransaction = false;
+        this.inTransaction.set(false);
         this.transactionBuffer = new KVStorageDelta(0, "0", "0");
     }
 
@@ -252,8 +258,9 @@ public class ClientConnection implements Runnable {
             }
 
             case TRANSACTION_GET: {
-                if(!inTransaction){
-                    responseMessage = new KVMessageImpl(null, "Transaction get in normal mode",
+                if (!inTransaction.get()) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Transaction get in normal mode",
                             KVMessage.StatusType.FAILED);
                     break;
                 }
@@ -349,8 +356,9 @@ public class ClientConnection implements Runnable {
             }
 
             case TRANSACTION_PUT: {
-                if(!inTransaction){
-                    responseMessage = new KVMessageImpl(null, "Transaction put in normal mode",
+                if (!inTransaction.get()) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Transaction put in normal mode",
                             KVMessage.StatusType.FAILED);
                     break;
                 }
@@ -546,7 +554,7 @@ public class ClientConnection implements Runnable {
 
             case TRANSACTION_BEGIN: {
                 try {
-                    this.inTransaction = true;
+                    this.inTransaction.set(true);
                     responseMessage = new KVMessageImpl(null, null,
                             KVMessage.StatusType.TRANSACTION_SUCCESS);
                 } catch (Exception e) {
@@ -590,7 +598,7 @@ public class ClientConnection implements Runnable {
                     }
 
 
-                    inTransaction = false;
+                    inTransaction.set(false);
                     transactionBuffer.clear();
                     server.unlockKeys(this);
 
@@ -611,7 +619,7 @@ public class ClientConnection implements Runnable {
             case TRANSACTION_ROLLBACK: {
 
                 try {
-                    inTransaction = false;
+                    inTransaction.set(false);
                     transactionBuffer.clear();
                     server.unlockKeys(this);
 
