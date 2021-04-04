@@ -260,7 +260,8 @@ public class KVStore implements KVCommInterface {
             }
             if (resStatus == KVMessage.StatusType.FAILED) {
                 throw new RetryTransactionException(
-                        String.format("Operation failed for key \"%s\"", key));
+                        String.format("Operation failed for key \"%s\": %s",
+                                key, message.getValue()));
             }
             return message;
         }
@@ -287,8 +288,7 @@ public class KVStore implements KVCommInterface {
             Exception {
         int id = -1;
         try {
-            id = connection.sendRequest(null, null,
-                    KVMessage.StatusType.TRANSACTION_COMMIT);
+            id = connection.sendRequest(null, null, status);
         } catch (IOException e) {
             throw new IOException(
                     getTransactionMetaRequestErrorPrefix(status) +
