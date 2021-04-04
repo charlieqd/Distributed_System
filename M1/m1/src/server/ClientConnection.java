@@ -593,41 +593,47 @@ public class ClientConnection implements Runnable {
 
             case TRANSACTION_COMMIT: {
                 try {
-                    boolean successful = true;
-                    for (Map.Entry<String, KVStorageDelta.Value> entry : transactionBuffer
-                            .getEntrySet()) {
+                    if (inTransaction.getAndSet(false)) {
+                        boolean successful = true;
+                        for (Map.Entry<String, KVStorageDelta.Value> entry : transactionBuffer
+                                .getEntrySet()) {
 
-                        String key = entry.getKey();
-                        KVStorageDelta.Value value = entry.getValue();
-                        KVMessage.StatusType putResponseType;
-                        try {
-                            putResponseType = storage.put(key, value.get());
-                        } catch (IOException e) {
-                            responseMessage = new KVMessageImpl(null,
-                                    "Internal server error: " +
-                                            Util.getStackTraceString(e),
-                                    KVMessage.StatusType.FAILED);
-                            successful = false;
-                            break;
+                            String key = entry.getKey();
+                            KVStorageDelta.Value value = entry.getValue();
+                            KVMessage.StatusType putResponseType;
+                            try {
+                                putResponseType = storage.put(key, value.get());
+                            } catch (IOException e) {
+                                responseMessage = new KVMessageImpl(null,
+                                        "Internal server error: " +
+                                                Util.getStackTraceString(e),
+                                        KVMessage.StatusType.FAILED);
+                                successful = false;
+                                break;
+                            }
+
+                            if (!PUT_SUCCESS_STATUS.contains(putResponseType)) {
+                                responseMessage = new KVMessageImpl(null,
+                                        "Invalid response for PUT operation: " +
+                                                putResponseType.name(),
+                                        KVMessage.StatusType.FAILED);
+                                successful = false;
+                                break;
+                            }
                         }
 
-                        if (!PUT_SUCCESS_STATUS.contains(putResponseType)) {
-                            responseMessage = new KVMessageImpl(null,
-                                    "Invalid response for PUT operation: " +
-                                            putResponseType.name(),
-                                    KVMessage.StatusType.FAILED);
-                            successful = false;
-                            break;
+                        transactionBuffer.clear();
+                        server.unlockKeys(this);
+
+                        if (successful) {
+                            responseMessage = new KVMessageImpl(null, null,
+                                    KVMessage.StatusType.TRANSACTION_SUCCESS);
                         }
-                    }
-
-                    inTransaction.set(false);
-                    transactionBuffer.clear();
-                    server.unlockKeys(this);
-
-                    if (successful) {
-                        responseMessage = new KVMessageImpl(null, null,
-                                KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    } else {
+                        responseMessage = new KVMessageImpl(null,
+                                "Transaction not started",
+                                KVMessage.StatusType.FAILED);
+                        break;
                     }
 
                 } catch (Exception e) {
