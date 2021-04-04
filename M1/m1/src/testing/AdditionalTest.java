@@ -24,9 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.*;
 
 public class AdditionalTest {
 
@@ -400,7 +398,8 @@ public class AdditionalTest {
         ServerConnection connection1 = null;
         try {
             String rootPath = folder.newFolder().toString();
-            KVStorage storage = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
                     1024, IKVServer.CacheStrategy.LRU);
             server = new KVServer(storage, new Protocol(),
                     new KVMessageSerializer(), 50001, "testServer", null);
@@ -413,7 +412,9 @@ public class AdditionalTest {
                             "92eb5ffee6ae2fec3ad71c777531578f"))));
             Thread.sleep(1000);
 
-            KVStorage storage1 = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1), 1024, IKVServer.CacheStrategy.LRU);
+            KVStorage storage1 = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1), 1024,
+                    IKVServer.CacheStrategy.LRU);
             server1 = new KVServer(
                     storage1, new Protocol(),
                     new KVMessageSerializer(), 50002, "testServer2", null);
@@ -437,7 +438,8 @@ public class AdditionalTest {
                     KVMessage.StatusType.GET);
             KVMessage message = connection.receiveMessage(id);
             assertEquals(KVMessage.StatusType.GET_ERROR, message.getStatus());
-            assertNotSame(KVMessage.StatusType.NOT_RESPONSIBLE, message.getStatus());
+            assertNotSame(KVMessage.StatusType.NOT_RESPONSIBLE,
+                    message.getStatus());
         } finally {
             if (connection != null) {
                 connection.disconnect(true);
@@ -462,7 +464,8 @@ public class AdditionalTest {
         ServerConnection connection1 = null;
         try {
             String rootPath = folder.newFolder().toString();
-            KVStorage storage = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
                     1024, IKVServer.CacheStrategy.LRU);
             server = new KVServer(storage, new Protocol(),
                     new KVMessageSerializer(), 50001, "testServer", null);
@@ -475,7 +478,9 @@ public class AdditionalTest {
                             "92eb5ffee6ae2fec3ad71c777531578f"))));
             Thread.sleep(1000);
 
-            KVStorage storage1 = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1), 1024, IKVServer.CacheStrategy.LRU);
+            KVStorage storage1 = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1), 1024,
+                    IKVServer.CacheStrategy.LRU);
             server1 = new KVServer(
                     storage1, new Protocol(),
                     new KVMessageSerializer(), 50002, "testServer2", null);
@@ -498,7 +503,8 @@ public class AdditionalTest {
             int id = connection.sendRequest("a", "1",
                     KVMessage.StatusType.PUT);
             KVMessage message = connection.receiveMessage(id);
-            assertEquals(KVMessage.StatusType.NOT_RESPONSIBLE, message.getStatus());
+            assertEquals(KVMessage.StatusType.NOT_RESPONSIBLE,
+                    message.getStatus());
 
             id = connection1.sendRequest("a", "1",
                     KVMessage.StatusType.PUT);
@@ -994,40 +1000,43 @@ public class AdditionalTest {
     }
 
     @Test
-    public void testKVStorageDeltaGet() {
-        KVStorageDelta delta;
-        HashMap<String, KVStorageDelta.Value> map = new HashMap<>();
-        map.clear();
-        delta = new KVStorageDelta(0,
-                "00000000000000000000000000000000",
-                "00000000000000000000000000000000");
-        delta.put("a", "1");
-        delta.put("b", "2");
-        delta.put("c", "3");
-        assertEquals("1", delta.get("a"));
-        assertEquals("2", delta.get("b"));
-        delta.put("b", null);
-        delta.put("c", "4");
-        delta.put("d", null);
-        assertEquals(null, delta.get("b"));
-        assertEquals("4", delta.get("c"));
-    }
+    public void testKeyLock() throws NoSuchAlgorithmException, IOException {
+        KVServer server = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            server = new KVServer(
+                    new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+                            1024, IKVServer.CacheStrategy.LRU), new Protocol(),
+                    new KVMessageSerializer(), 50002, "testServer1", null);
+            ClientConnection clientA = new ClientConnection(null, null, null,
+                    null, null);
+            ClientConnection clientB = new ClientConnection(null, null, null,
+                    null, null);
+            server.addLockedKey("a", clientA);
+            server.addLockedKey("b", clientB);
 
-    @Test
-    public void testKVStorageDeltaClear() {
-        KVStorageDelta delta;
-        HashMap<String, KVStorageDelta.Value> map = new HashMap<>();
-        map.clear();
-        delta = new KVStorageDelta(0,
-                "00000000000000000000000000000000",
-                "00000000000000000000000000000000");
-        assertEquals(0, delta.getEntryCount());
-        delta.put("a", "1");
-        delta.put("b", "2");
-        delta.put("c", "3");
-        assertEquals(3, delta.getEntryCount());
-        delta.clear();
-        assertEquals(0, delta.getEntryCount());
-    }
+            // key is locked for other client
+            assertEquals(true, server.isKeyLocked("a", clientB));
+            assertEquals(true, server.isKeyLocked("b", clientA));
 
+            // key will not lock the same client
+            assertEquals(false, server.isKeyLocked("a", clientA));
+            assertEquals(false, server.isKeyLocked("b", clientB));
+
+            // unlock key "a"
+            server.unlockKeys(clientA);
+            assertEquals(false, server.isKeyLocked("a", clientB));
+            assertEquals(true, server.isKeyLocked("b", clientA));
+
+            // unlock key "b"
+            server.unlockKeys(clientB);
+            assertEquals(false, server.isKeyLocked("b", clientA));
+
+        } finally {
+
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
 }

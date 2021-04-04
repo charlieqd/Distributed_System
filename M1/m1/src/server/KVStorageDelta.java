@@ -95,6 +95,10 @@ public class KVStorageDelta {
         return null;
     }
 
+    public boolean containsKey(String key) {
+        return values.containsKey(key);
+    }
+
     /**
      * Clear values
      */
