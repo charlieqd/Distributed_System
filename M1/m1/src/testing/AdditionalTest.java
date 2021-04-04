@@ -1039,4 +1039,46 @@ public class AdditionalTest {
             }
         }
     }
+
+    @Test
+    public void testTimeoutChecker() throws NoSuchAlgorithmException,
+            IOException, InterruptedException {
+        KVServer server = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            server = new KVServer(
+                    new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+                            1024, IKVServer.CacheStrategy.LRU), new Protocol(),
+                    new KVMessageSerializer(), 50002, "testServer1", null);
+            server.start();
+            server.startServing();
+
+            ClientConnection clientA = new ClientConnection(null, null, null,
+                    null, null);
+            ClientConnection clientB = new ClientConnection(null, null, null,
+                    null, null);
+
+            server.addLockedKey("a", clientA);
+            server.addLockedKey("b", clientB);
+
+            clientA.setLastTransactionTime(System.currentTimeMillis() - 4000);
+            clientB.setLastTransactionTime(System.currentTimeMillis() - 4000);
+
+            // key is locked for other client
+            assertEquals(true, server.isKeyLocked("a", clientB));
+            assertEquals(true, server.isKeyLocked("b", clientA));
+
+            Thread.sleep(4000);
+
+            // key lock will be released because of timeout
+            assertEquals(false, server.isKeyLocked("a", clientB));
+            assertEquals(false, server.isKeyLocked("b", clientA));
+
+        } finally {
+
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
 }

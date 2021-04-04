@@ -45,7 +45,7 @@ public class KVServer extends Thread implements IKVServer {
     private static final String DEFAULT_DATA_PATH = "data";
     private static final String DEFAULT_LOG_LEVEL = "INFO";
 
-    private static final long TRANSACTION_TIMEOUT_MILLIS = 5000;
+    public static final long TRANSACTION_TIMEOUT_MILLIS = 5000;
 
     private int port;
     private ServerSocket serverSocket;
@@ -102,7 +102,6 @@ public class KVServer extends Thread implements IKVServer {
         this.replicator.start();
 
         this.timeoutChecker = new TimeoutChecker(this);
-        this.timeoutChecker.start();
     }
 
     public Replicator getReplicator() {
@@ -118,6 +117,7 @@ public class KVServer extends Thread implements IKVServer {
         //Options options = new Options();
 
         running.set(initializeServer());
+        this.timeoutChecker.start();
 
         if (serverSocket != null) {
             String node = String

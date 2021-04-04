@@ -72,6 +72,10 @@ public class ClientConnection implements Runnable {
         this.inTransaction.set(inTransaction);
     }
 
+    public void setLastTransactionTime(long lastTransactionTime) {
+        this.lastTransactionTime.set(lastTransactionTime);
+    }
+
     public long getLastTransactionTime() {
         return lastTransactionTime.get();
     }
