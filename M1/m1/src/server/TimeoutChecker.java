@@ -3,16 +3,11 @@ package server;
 import app_kvServer.KVServer;
 import org.apache.log4j.Logger;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 public class TimeoutChecker extends Thread {
 
-    KVServer server;
-    private final AtomicBoolean running = new AtomicBoolean(true);
+    private KVServer server;
 
     private static final long CHECK_MILLIS = 2000;
-
-    private static final long TIMEOUT_PERIOD = 5000;
 
     private static Logger logger = Logger.getRootLogger();
 
@@ -24,7 +19,7 @@ public class TimeoutChecker extends Thread {
     public void run() {
         while (server.isRunning()) {
             if (server.serving.get()) {
-                server.checkLockTimeout(TIMEOUT_PERIOD);
+                server.checkLockTimeout();
             }
         }
 

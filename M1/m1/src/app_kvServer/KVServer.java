@@ -30,13 +30,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer {
 
-    private static class LockInfo {
+    private static class KeyLockInfo {
         public ClientConnection client;
-        public long time;
 
-        public LockInfo(ClientConnection client, long time) {
+        public KeyLockInfo(ClientConnection client) {
             this.client = client;
-            this.time = time;
         }
     }
 
@@ -46,6 +44,8 @@ public class KVServer extends Thread implements IKVServer {
     private static final String DEFAULT_PORT = "8080";
     private static final String DEFAULT_DATA_PATH = "data";
     private static final String DEFAULT_LOG_LEVEL = "INFO";
+
+    private static final long TRANSACTION_TIMEOUT_MILLIS = 5000;
 
     private int port;
     private ServerSocket serverSocket;
@@ -70,7 +70,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
 
-    private HashMap<String, LockInfo> lockedKeys = new HashMap<>();
+    private HashMap<String, KeyLockInfo> lockedKeys = new HashMap<>();
 
     private final Replicator replicator;
 
@@ -160,7 +160,7 @@ public class KVServer extends Thread implements IKVServer {
         lockedKeysMutex.lock();
         try {
             lockedKeys
-                    .put(key, new LockInfo(client, System.currentTimeMillis()));
+                    .put(key, new KeyLockInfo(client));
         } finally {
             lockedKeysMutex.unlock();
         }
@@ -169,12 +169,8 @@ public class KVServer extends Thread implements IKVServer {
     public boolean isKeyLocked(String key, ClientConnection client) {
         lockedKeysMutex.lock();
         try {
-            if (lockedKeys.get(key) == null || lockedKeys
-                    .get(key).client == client) {
-                return false;
-            } else {
-                return true;
-            }
+            return lockedKeys.get(key) != null &&
+                    lockedKeys.get(key).client != client;
         } finally {
             lockedKeysMutex.unlock();
         }
@@ -189,17 +185,31 @@ public class KVServer extends Thread implements IKVServer {
         }
     }
 
-    public void checkLockTimeout(long timeoutPeriod) {
+    public void checkLockTimeout() {
         lockedKeysMutex.lock();
         try {
-            Set<String> keys = lockedKeys.keySet();
-            for (Object k : keys) {
-                if (System.currentTimeMillis() - lockedKeys
-                        .get(k).time > timeoutPeriod) {
-                    lockedKeys.get(k).client.setInTransaction(false);
-                    lockedKeys.remove(k);
+            long currentTime = System.currentTimeMillis();
+            HashMap<ClientConnection, Long> clientLastTransactionTime =
+                    new HashMap<>();
+            lockedKeys.entrySet().removeIf(e -> {
+                KeyLockInfo info = e.getValue();
+                long lastTransactionTime = 0;
+                if (clientLastTransactionTime.containsKey(info.client)) {
+                    lastTransactionTime = clientLastTransactionTime
+                            .get(info.client);
+                } else {
+                    lastTransactionTime = info.client.getLastTransactionTime();
+                    clientLastTransactionTime
+                            .put(info.client, lastTransactionTime);
                 }
-            }
+                if (currentTime - lastTransactionTime >
+                        TRANSACTION_TIMEOUT_MILLIS) {
+                    info.client.setInTransaction(false);
+                    // Will remove all keys belonging to this client.
+                    return true;
+                }
+                return false;
+            });
         } finally {
             lockedKeysMutex.unlock();
         }

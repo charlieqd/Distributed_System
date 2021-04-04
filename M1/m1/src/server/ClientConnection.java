@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -34,10 +35,6 @@ public class ClientConnection implements Runnable {
     private final IProtocol protocol;
     private final ISerializer<KVMessage> messageSerializer;
 
-    public void setInTransaction(boolean inTransaction) {
-        this.inTransaction.set(inTransaction);
-    }
-
     private AtomicBoolean inTransaction = new AtomicBoolean(false);
     private KVStorageDelta transactionBuffer = null;
 
@@ -46,7 +43,10 @@ public class ClientConnection implements Runnable {
     private static final HashSet<KVMessage.StatusType> PUT_SUCCESS_STATUS = new HashSet<>(
             Arrays.asList(KVMessage.StatusType.PUT_SUCCESS,
                     KVMessage.StatusType.DELETE_SUCCESS,
+                    KVMessage.StatusType.DELETE_ERROR,
                     KVMessage.StatusType.PUT_UPDATE));
+
+    private final AtomicLong lastTransactionTime = new AtomicLong(0);
 
     /**
      * Constructs a new CientConnection object for a given TCP socket.
@@ -66,6 +66,14 @@ public class ClientConnection implements Runnable {
         this.messageSerializer = messageSerializer;
         this.inTransaction.set(false);
         this.transactionBuffer = new KVStorageDelta(0, "0", "0");
+    }
+
+    public void setInTransaction(boolean inTransaction) {
+        this.inTransaction.set(inTransaction);
+    }
+
+    public long getLastTransactionTime() {
+        return lastTransactionTime.get();
     }
 
     /**
@@ -560,9 +568,16 @@ public class ClientConnection implements Runnable {
 
             case TRANSACTION_BEGIN: {
                 try {
-                    this.inTransaction.set(true);
-                    responseMessage = new KVMessageImpl(null, null,
-                            KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    if (!inTransaction.getAndSet(true)) {
+                        transactionBuffer.clear();
+                        lastTransactionTime.set(System.currentTimeMillis());
+                        responseMessage = new KVMessageImpl(null, null,
+                                KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    } else {
+                        responseMessage = new KVMessageImpl(null,
+                                "Transaction already started",
+                                KVMessage.StatusType.FAILED);
+                    }
                 } catch (Exception e) {
                     responseMessage = new KVMessageImpl(null,
                             "Transaction begin error: " + Util
@@ -596,13 +611,13 @@ public class ClientConnection implements Runnable {
 
                         if (!PUT_SUCCESS_STATUS.contains(putResponseType)) {
                             responseMessage = new KVMessageImpl(null,
-                                    "Internal server error",
+                                    "Invalid response: " +
+                                            putResponseType.name(),
                                     KVMessage.StatusType.FAILED);
                             successful = false;
                             break;
                         }
                     }
-
 
                     inTransaction.set(false);
                     transactionBuffer.clear();
@@ -613,31 +628,35 @@ public class ClientConnection implements Runnable {
                                 KVMessage.StatusType.TRANSACTION_SUCCESS);
                     }
 
-                    break;
                 } catch (Exception e) {
                     responseMessage = new KVMessageImpl(null,
-                            "Internal server error",
+                            "Internal server error: " +
+                                    Util.getStackTraceString(e),
                             KVMessage.StatusType.FAILED);
-                    break;
                 }
+                break;
             }
 
             case TRANSACTION_ROLLBACK: {
-
                 try {
-                    inTransaction.set(false);
-                    transactionBuffer.clear();
-                    server.unlockKeys(this);
+                    if (inTransaction.getAndSet(false)) {
+                        transactionBuffer.clear();
+                        server.unlockKeys(this);
 
-                    responseMessage = new KVMessageImpl(null, null,
-                            KVMessage.StatusType.TRANSACTION_SUCCESS);
-                    break;
+                        responseMessage = new KVMessageImpl(null, null,
+                                KVMessage.StatusType.TRANSACTION_SUCCESS);
+                    } else {
+                        responseMessage = new KVMessageImpl(null,
+                                "Transaction not started",
+                                KVMessage.StatusType.FAILED);
+                    }
                 } catch (Exception e) {
                     responseMessage = new KVMessageImpl(null,
-                            "Internal server error",
+                            "Internal server error: " +
+                                    Util.getStackTraceString(e),
                             KVMessage.StatusType.FAILED);
-                    break;
                 }
+                break;
             }
 
             default: {
