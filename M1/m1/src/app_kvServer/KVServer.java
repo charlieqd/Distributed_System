@@ -30,11 +30,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer {
 
-    private static class lockInfo {
+    private static class LockInfo {
         public ClientConnection client;
         public long time;
 
-        public lockInfo(ClientConnection client, long time) {
+        public LockInfo(ClientConnection client, long time) {
             this.client = client;
             this.time = time;
         }
@@ -58,7 +58,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private String name;
 
-    private final Lock lock;
+    private final Lock lockedKeysMutex;
 
     public final AtomicBoolean serving = new AtomicBoolean(false);
     public final AtomicBoolean writeLock = new AtomicBoolean(false);
@@ -70,7 +70,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
 
-    private HashMap<String, lockInfo> lockedKeys = new HashMap<>();
+    private HashMap<String, LockInfo> lockedKeys = new HashMap<>();
 
     private final Replicator replicator;
 
@@ -88,7 +88,7 @@ public class KVServer extends Thread implements IKVServer {
                     IProtocol protocol,
                     ISerializer<KVMessage> messageSerializer,
                     int port, String name, ZooKeeperService zooKeeperService) {
-        this.lock = new ReentrantLock();
+        this.lockedKeysMutex = new ReentrantLock();
         this.name = name;
         this.storage = storage;
         this.protocol = protocol;
@@ -157,17 +157,17 @@ public class KVServer extends Thread implements IKVServer {
     }
 
     public void addLockedKey(String key, ClientConnection client) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
             lockedKeys
-                    .put(key, new lockInfo(client, System.currentTimeMillis()));
+                    .put(key, new LockInfo(client, System.currentTimeMillis()));
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
     public boolean isKeyLocked(String key, ClientConnection client) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
             ClientConnection value = lockedKeys.get(key).client;
             if (value == null || value == client) {
@@ -176,26 +176,21 @@ public class KVServer extends Thread implements IKVServer {
                 return true;
             }
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
     public void unlockKeys(ClientConnection client) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
-            Set<String> keys = lockedKeys.keySet();
-            for (Object k : keys) {
-                if (lockedKeys.get(k).client == client) {
-                    lockedKeys.remove(k);
-                }
-            }
+            lockedKeys.entrySet().removeIf(e -> e.getValue().client == client);
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
     public void checkLockTimeout(long timeoutPeriod) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
             Set<String> keys = lockedKeys.keySet();
             for (Object k : keys) {
@@ -206,7 +201,7 @@ public class KVServer extends Thread implements IKVServer {
                 }
             }
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
@@ -334,7 +329,8 @@ public class KVServer extends Thread implements IKVServer {
                 }
                 if (!cmd.hasOption("d")) {
                     System.out.println(
-                            "Using default data path '" + DEFAULT_DATA_PATH + "'");
+                            "Using default data path '" + DEFAULT_DATA_PATH +
+                                    "'");
                 }
 
                 cacheSize = Integer.parseInt(cmd.getOptionValue("s",
@@ -518,8 +514,9 @@ public class KVServer extends Thread implements IKVServer {
                             // Success
                         } else {
                             logger.error(
-                                    "Failed to send data to next server: response status = " + resStatus
-                                            .toString());
+                                    "Failed to send data to next server: response status = " +
+                                            resStatus
+                                                    .toString());
                             return false;
                         }
                     } catch (Exception e) {

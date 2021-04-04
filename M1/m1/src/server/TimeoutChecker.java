@@ -10,7 +10,7 @@ public class TimeoutChecker extends Thread {
     KVServer server;
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    private static final long ChECK_MILLIS = 2000;
+    private static final long CHECK_MILLIS = 2000;
 
     private static final long TIMEOUT_PERIOD = 5000;
 
@@ -29,7 +29,7 @@ public class TimeoutChecker extends Thread {
         }
 
         try {
-            Thread.sleep(ChECK_MILLIS);
+            Thread.sleep(CHECK_MILLIS);
         } catch (InterruptedException e) {
             logger.error(e);
             return;

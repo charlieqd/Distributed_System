@@ -125,6 +125,9 @@ public class ClientConnection implements Runnable {
         } catch (IOException ioe) {
             logger.error("Error: Connection could not be established.", ioe);
 
+        } catch (Exception e) {
+            logger.error("Internal server error.", e);
+
         } finally {
             server.unregisterClientConnection(this);
             try {
