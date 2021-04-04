@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.UnknownHostException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class KVClient implements IKVClient, KVStoreListener {
 
@@ -28,6 +30,8 @@ public class KVClient implements IKVClient, KVStoreListener {
 
     private String serverAddress;
     private int serverPort;
+
+    private Map<String, TransactionRunner> transactionRunners = new HashMap<>();
 
     public KVClient(InputStream inputStream) {
         this.input = inputStream;
@@ -63,6 +67,7 @@ public class KVClient implements IKVClient, KVStoreListener {
     }
 
     private void handleCommand(String cmdLine) throws Exception {
+        // Seems like splitting on empty strings still returns one empty token
         String[] tokens = cmdLine.trim().split("\\s+");
 
         if (tokens[0].equals("quit")) {
@@ -153,12 +158,34 @@ public class KVClient implements IKVClient, KVStoreListener {
                 printError("Invalid number of parameters!");
             }
 
+        } else if (tokens.length >= 2 && tokens[0].equals("def") &&
+                tokens[1].equals("transaction")) {
+            if (tokens.length == 3) {
+                String transactionName = tokens[2];
+                TransactionRunner runner = createTransaction();
+                if (runner != null) {
+                    transactionRunners.put(transactionName, runner);
+                }
+            } else {
+                printError("Invalid number of parameters!");
+            }
+
         } else if (tokens[0].equals("transaction")) {
             if (tokens.length == 1) {
-                if (connectionValid()) {
-                    beginTransaction();
+                TransactionRunner runner = createTransaction();
+                if (runner != null) {
+                    runTransaction(runner);
+                }
+            } else if (tokens.length == 2) {
+                String transactionName = tokens[1];
+                TransactionRunner runner = transactionRunners
+                        .get(transactionName);
+                if (runner != null) {
+                    runTransaction(runner);
                 } else {
-                    printError("Not connected or connection stopped!");
+                    printError(
+                            String.format("Transaction \"%s\" is not defined.",
+                                    transactionName));
                 }
             } else {
                 printError("Invalid number of parameters!");
@@ -184,19 +211,7 @@ public class KVClient implements IKVClient, KVStoreListener {
         }
     }
 
-    private void beginTransaction() {
-        TransactionInterpreter transaction = new TransactionInterpreter();
-        TransactionRunner runner = null;
-        try {
-            runner = transaction.parse();
-        } catch (Exception e) {
-            printError("Failed to create transaction: " +
-                    Util.getStackTraceString(e));
-            return;
-        }
-        if (runner == null) {
-            return;
-        }
+    private void runTransaction(TransactionRunner runner) {
         if (connectionValid()) {
             try {
                 kvStore.runTransaction(runner);
@@ -207,6 +222,19 @@ public class KVClient implements IKVClient, KVStoreListener {
         } else {
             printError("Not connected or connection stopped!");
         }
+    }
+
+    private TransactionRunner createTransaction() {
+        TransactionInterpreter transaction = new TransactionInterpreter();
+        TransactionRunner runner = null;
+        try {
+            runner = transaction.parse();
+        } catch (Exception e) {
+            printError("Failed to create transaction: " +
+                    Util.getStackTraceString(e));
+            return null;
+        }
+        return runner;
     }
 
     private void putData(String key, String value) throws Exception {
@@ -301,8 +329,12 @@ public class KVClient implements IKVClient, KVStoreListener {
                 "\t insert or update a tuple. if value is not given, delete the tuple. \n");
         sb.append("delete <key>");
         sb.append("\t\t delete the tuple from the server \n");
-        sb.append("transaction");
-        sb.append("\t\t begin a transaction \n");
+        sb.append("transaction [name]");
+        sb.append(
+                "\t executes a transaction. if name is given, executes the pre-defined transaction. \n");
+        sb.append("def transaction name");
+        sb.append(
+                "\t defines a transaction with the given name. \n");
         sb.append("disconnect");
         sb.append("\t\t disconnects from the server \n");
 

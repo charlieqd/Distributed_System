@@ -21,13 +21,13 @@ public class TimeoutChecker extends Thread {
             if (server.serving.get()) {
                 server.checkLockTimeout();
             }
-        }
 
-        try {
-            Thread.sleep(CHECK_MILLIS);
-        } catch (InterruptedException e) {
-            logger.error(e);
-            return;
+            try {
+                Thread.sleep(CHECK_MILLIS);
+            } catch (InterruptedException e) {
+                logger.error(e);
+                return;
+            }
         }
     }
 }

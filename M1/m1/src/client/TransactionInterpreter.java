@@ -294,6 +294,10 @@ public class TransactionInterpreter {
                 Instruction value = parseExpression(tokens, start + 2, end);
                 return new PutRequest(key, value);
 
+            } else if (numTokens == 2 && tokens[start].equals("put")) {
+                String key = tokens[start + 1];
+                return new PutRequest(key, null);
+
             } else {
                 throw new ParseException("Invalid statement");
             }
@@ -306,6 +310,7 @@ public class TransactionInterpreter {
         instructions.clear();
         BufferedReader stdin = new BufferedReader(
                 new InputStreamReader(System.in));
+        System.out.println("(Type \"help\" for help)");
         while (true) {
             System.out.print(PROMPT);
             try {
@@ -313,6 +318,8 @@ public class TransactionInterpreter {
                 try {
                     if (tokens.length == 1 && tokens[0].equals("end")) {
                         return getFunction(instructions);
+                    } else if (tokens.length == 1 && tokens[0].equals("help")) {
+                        printHelpMessage();
                     } else if (tokens.length == 1 &&
                             tokens[0].equals("abort")) {
                         instructions.clear();
@@ -331,6 +338,53 @@ public class TransactionInterpreter {
                 return null;
             }
         }
+    }
+
+    private void printHelpMessage() {
+        System.out.println(
+                "Transaction mode: defines and executes a transaction. You can enter commands and statements. Statements are recorded and evaluated when the transaction is executed.");
+        System.out.println();
+        System.out.println("Commands:");
+        System.out.println("- help: display this message.");
+        System.out
+                .println("- end: finish defining the transaction.");
+        System.out.println("- abort: quit transaction mode.");
+        System.out.println();
+        System.out.println("Statements:");
+        System.out.println(
+                "- $<variable> = <expression>: assign the value of the expression to the variable.");
+        System.out.println("    Expressions can be one of the following:");
+        System.out.println("    - <value>: representing a string value.");
+        System.out.println(
+                "        If starting with $, will evaluate to the value of a variable");
+        System.out.println(
+                "        If surrounded by \"\", will evaluate to the enclosed string");
+        System.out.println(
+                "        Otherwise, will evaluate to the token string itself");
+        System.out.println(
+                "    - <value> <op> <value>: perform integer operation.");
+        System.out.println(
+                "        <op> can be +, -, *, or / (integer division).");
+        System.out.println(
+                "        Operands must be strings containing integer.");
+        System.out.println(
+                "        Result will be a string containing integer.");
+        System.out.println(
+                "    - get <key> [default <default-value>]: get a tuple from the database.");
+        System.out.println(
+                "        If default value is given, will use the value if the tuple does not exist.");
+        System.out.println("    Examples:");
+        System.out.println("    - $a = get a");
+        System.out.println("    - $b = $a + 2");
+        System.out.println("    - $c = get c default 10");
+        System.out.println(
+                "- put <key> [<expression>]: set the value of a tuple in the database to the value of the expression.");
+        System.out.println(
+                "    If value is not given, delete the tuple from the database.");
+        System.out.println("    Examples:");
+        System.out.println("    - put a 1");
+        System.out.println("    - put a $a + 10");
+        System.out.println("    - put b get a");
     }
 
     private TransactionRunner getFunction(List<Instruction> instructions) {

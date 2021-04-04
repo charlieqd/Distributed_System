@@ -173,6 +173,10 @@ public class ClientConnection implements Runnable {
     }
 
     private boolean isResponsibleForKeyWrite(String key) {
+        return isCoordinatorOf(key);
+    }
+
+    private boolean isCoordinatorOf(String key) {
         String nodeName = server.getNodeName();
         if (nodeName == null) {
             logger.error("Server name is null");
@@ -287,7 +291,8 @@ public class ClientConnection implements Runnable {
                 }
                 if (!server.serving.get()) {
                     responseMessage = handleNotServing();
-                } else if (!isResponsibleForKeyRead(key)) {
+                } else if (!isCoordinatorOf(key)) {
+                    // NOTE: Only coordinator can handle transactions.
                     responseMessage = handleNotResponsible();
                 } else {
                     String value;
@@ -392,7 +397,7 @@ public class ClientConnection implements Runnable {
 
                 if (!server.serving.get()) {
                     responseMessage = handleNotServing();
-                } else if (!isResponsibleForKeyWrite(key)) {
+                } else if (!isCoordinatorOf(key)) {
                     responseMessage = handleNotResponsible();
                 } else if (server.writeLock.get()) {
                     responseMessage = handleWriteLocked();
