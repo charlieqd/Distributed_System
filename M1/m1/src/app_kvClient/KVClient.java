@@ -186,9 +186,15 @@ public class KVClient implements IKVClient, KVStoreListener {
 
     private void beginTransaction() {
         TransactionInterpreter transaction = new TransactionInterpreter();
-        TransactionRunner runner = transaction.parse();
+        TransactionRunner runner = null;
+        try {
+            runner = transaction.parse();
+        } catch (Exception e) {
+            printError("Failed to create transaction: " +
+                    Util.getStackTraceString(e));
+            return;
+        }
         if (runner == null) {
-            printError("Failed to create transaction.");
             return;
         }
         if (connectionValid()) {

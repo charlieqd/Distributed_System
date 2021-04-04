@@ -30,13 +30,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class KVServer extends Thread implements IKVServer {
 
-    private static class lockInfo {
+    private static class KeyLockInfo {
         public ClientConnection client;
-        public long time;
 
-        public lockInfo(ClientConnection client, long time) {
+        public KeyLockInfo(ClientConnection client) {
             this.client = client;
-            this.time = time;
         }
     }
 
@@ -46,6 +44,8 @@ public class KVServer extends Thread implements IKVServer {
     private static final String DEFAULT_PORT = "8080";
     private static final String DEFAULT_DATA_PATH = "data";
     private static final String DEFAULT_LOG_LEVEL = "INFO";
+
+    private static final long TRANSACTION_TIMEOUT_MILLIS = 5000;
 
     private int port;
     private ServerSocket serverSocket;
@@ -58,7 +58,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private String name;
 
-    private final Lock lock;
+    private final Lock lockedKeysMutex;
 
     public final AtomicBoolean serving = new AtomicBoolean(false);
     public final AtomicBoolean writeLock = new AtomicBoolean(false);
@@ -70,7 +70,7 @@ public class KVServer extends Thread implements IKVServer {
 
     private final Set<ClientConnection> clientConnections = new HashSet<>();
 
-    private HashMap<String, lockInfo> lockedKeys = new HashMap<>();
+    private HashMap<String, KeyLockInfo> lockedKeys = new HashMap<>();
 
     private final Replicator replicator;
 
@@ -88,7 +88,7 @@ public class KVServer extends Thread implements IKVServer {
                     IProtocol protocol,
                     ISerializer<KVMessage> messageSerializer,
                     int port, String name, ZooKeeperService zooKeeperService) {
-        this.lock = new ReentrantLock();
+        this.lockedKeysMutex = new ReentrantLock();
         this.name = name;
         this.storage = storage;
         this.protocol = protocol;
@@ -157,56 +157,61 @@ public class KVServer extends Thread implements IKVServer {
     }
 
     public void addLockedKey(String key, ClientConnection client) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
             lockedKeys
-                    .put(key, new lockInfo(client, System.currentTimeMillis()));
+                    .put(key, new KeyLockInfo(client));
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
     public boolean isKeyLocked(String key, ClientConnection client) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
-            ClientConnection value = lockedKeys.get(key).client;
-            if (value == null || value == client) {
-                return false;
-            } else {
-                return true;
-            }
+            return lockedKeys.get(key) != null &&
+                    lockedKeys.get(key).client != client;
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
     public void unlockKeys(ClientConnection client) {
-        lock.lock();
+        lockedKeysMutex.lock();
         try {
-            Set<String> keys = lockedKeys.keySet();
-            for (Object k : keys) {
-                if (lockedKeys.get(k).client == client) {
-                    lockedKeys.remove(k);
-                }
-            }
+            lockedKeys.entrySet().removeIf(e -> e.getValue().client == client);
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
-    public void checkLockTimeout(long timeoutPeriod) {
-        lock.lock();
+    public void checkLockTimeout() {
+        lockedKeysMutex.lock();
         try {
-            Set<String> keys = lockedKeys.keySet();
-            for (Object k : keys) {
-                if (System.currentTimeMillis() - lockedKeys
-                        .get(k).time > timeoutPeriod) {
-                    lockedKeys.get(k).client.setInTransaction(false);
-                    lockedKeys.remove(k);
+            long currentTime = System.currentTimeMillis();
+            HashMap<ClientConnection, Long> clientLastTransactionTime =
+                    new HashMap<>();
+            lockedKeys.entrySet().removeIf(e -> {
+                KeyLockInfo info = e.getValue();
+                long lastTransactionTime = 0;
+                if (clientLastTransactionTime.containsKey(info.client)) {
+                    lastTransactionTime = clientLastTransactionTime
+                            .get(info.client);
+                } else {
+                    lastTransactionTime = info.client.getLastTransactionTime();
+                    clientLastTransactionTime
+                            .put(info.client, lastTransactionTime);
                 }
-            }
+                if (currentTime - lastTransactionTime >
+                        TRANSACTION_TIMEOUT_MILLIS) {
+                    info.client.setInTransaction(false);
+                    // Will remove all keys belonging to this client.
+                    return true;
+                }
+                return false;
+            });
         } finally {
-            lock.unlock();
+            lockedKeysMutex.unlock();
         }
     }
 
@@ -334,7 +339,8 @@ public class KVServer extends Thread implements IKVServer {
                 }
                 if (!cmd.hasOption("d")) {
                     System.out.println(
-                            "Using default data path '" + DEFAULT_DATA_PATH + "'");
+                            "Using default data path '" + DEFAULT_DATA_PATH +
+                                    "'");
                 }
 
                 cacheSize = Integer.parseInt(cmd.getOptionValue("s",
@@ -518,8 +524,9 @@ public class KVServer extends Thread implements IKVServer {
                             // Success
                         } else {
                             logger.error(
-                                    "Failed to send data to next server: response status = " + resStatus
-                                            .toString());
+                                    "Failed to send data to next server: response status = " +
+                                            resStatus
+                                                    .toString());
                             return false;
                         }
                     } catch (Exception e) {

@@ -93,7 +93,7 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public KVMessage transactionPut(String key, String value) throws Exception {
-        if (transactionRunning) {
+        if (!transactionRunning) {
             throw new IllegalStateException(
                     "Transaction not running. Use put instead.");
         }
@@ -103,7 +103,7 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public KVMessage transactionGet(String key) throws Exception {
-        if (transactionRunning) {
+        if (!transactionRunning) {
             throw new IllegalStateException(
                     "Transaction not running. Use get instead.");
         }
@@ -372,9 +372,15 @@ public class KVStore implements KVCommInterface {
     private void processNewMetadata(Metadata metadata) {
         // If metadata is null, that means the server who sent the metadata did
         // not know any metadata at all.
-        if (metadata == null) return;
+        if (metadata == null) {
+            logger.info("Received null metadata.");
+            return;
+        }
 
         logger.info("Received new metadata. Refreshing connections...");
+        if (logger.isDebugEnabled()) {
+            logger.debug(metadata.toString());
+        }
 
         for (ServerConnection connection : connections.values()) {
             connection.disconnect();
