@@ -992,4 +992,42 @@ public class AdditionalTest {
         assertEquals("4", map.get("b").get());
         assertEquals((Integer) 3, storage.getCurrentDeltaLogicalTime());
     }
+
+    @Test
+    public void testKVStorageDeltaGet() {
+        KVStorageDelta delta;
+        HashMap<String, KVStorageDelta.Value> map = new HashMap<>();
+        map.clear();
+        delta = new KVStorageDelta(0,
+                "00000000000000000000000000000000",
+                "00000000000000000000000000000000");
+        delta.put("a", "1");
+        delta.put("b", "2");
+        delta.put("c", "3");
+        assertEquals("1", delta.get("a"));
+        assertEquals("2", delta.get("b"));
+        delta.put("b", null);
+        delta.put("c", "4");
+        delta.put("d", null);
+        assertEquals(null, delta.get("b"));
+        assertEquals("4", delta.get("c"));
+    }
+
+    @Test
+    public void testKVStorageDeltaClear() {
+        KVStorageDelta delta;
+        HashMap<String, KVStorageDelta.Value> map = new HashMap<>();
+        map.clear();
+        delta = new KVStorageDelta(0,
+                "00000000000000000000000000000000",
+                "00000000000000000000000000000000");
+        assertEquals(0, delta.getEntryCount());
+        delta.put("a", "1");
+        delta.put("b", "2");
+        delta.put("c", "3");
+        assertEquals(3, delta.getEntryCount());
+        delta.clear();
+        assertEquals(0, delta.getEntryCount());
+    }
+
 }
