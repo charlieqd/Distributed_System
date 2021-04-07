@@ -2,6 +2,7 @@ package testing;
 
 import app_kvServer.IKVServer;
 import app_kvServer.KVServer;
+import client.KVStore;
 import client.ServerConnection;
 import ecs.ECSController;
 import org.junit.Rule;
@@ -1340,8 +1341,7 @@ public class AdditionalTest {
     }
 
     @Test
-    public void testTransactionCommit() throws IOException,
-            InterruptedException {
+    public void testTransactionCommit() {
 
         KVServer server = null;
         ServerConnection connection = null;
@@ -1411,6 +1411,86 @@ public class AdditionalTest {
         } finally {
             if (connection != null) {
                 connection.disconnect(true);
+            }
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
+
+    @Test
+    public void testKVStoreTransaction() throws Exception {
+
+        KVServer server = null;
+        KVStore kvStore = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
+                    1024, IKVServer.CacheStrategy.LRU);
+            server = new KVServer(storage, new Protocol(),
+                    new KVMessageSerializer(), 50001, "testServer", null);
+            server.start();
+            server.startServing();
+            server.updateMetadata(new Metadata(Arrays.asList(
+                    new ECSNode("testServer", "127.0.0.1", 50001,
+                            "92eb5ffee6ae2fec3ad71c777531578f"))));
+            Thread.sleep(1000);
+
+            kvStore = new KVStore("127.0.0.1", 50001);
+            kvStore.connect();
+
+            kvStore.put("a", "420");
+            kvStore.put("b", "69");
+
+            Set<KVMessage.StatusType> ACCEPTABLE_RESPONSE_STATUSES = new HashSet<>(
+                    Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
+                            KVMessage.StatusType.PUT_SUCCESS,
+                            KVMessage.StatusType.GET_SUCCESS,
+                            KVMessage.StatusType.GET_ERROR));
+
+            kvStore.runTransaction(store -> {
+                int value1 = 0;
+                int value2 = 0;
+                String key1 = "a";
+                String key2 = "b";
+                KVMessage message1 = store
+                        .transactionGet(key1);
+                value1 = Integer.parseInt(message1.getValue());
+                KVMessage response1 = store
+                        .transactionPut(key1,
+                                Integer.toString(value1 - 10));
+                if (!ACCEPTABLE_RESPONSE_STATUSES
+                        .contains(response1.getStatus())) {
+                    throw new IllegalStateException(
+                            "Invalid response: " +
+                                    response1.toString());
+                }
+                KVMessage message2 = store
+                        .transactionGet(key2);
+                value2 = Integer.parseInt(message2.getValue());
+                KVMessage response2 = store
+                        .transactionPut(key2,
+                                Integer.toString(value2 + 10));
+                if (!ACCEPTABLE_RESPONSE_STATUSES
+                        .contains(response2.getStatus())) {
+                    throw new IllegalStateException(
+                            "Invalid response: " +
+                                    response2.toString());
+                }
+            });
+
+            KVMessage response1 = kvStore.get("a");
+            KVMessage response2 = kvStore.get("b");
+            assertEquals(response1.getStatus(),
+                    KVMessage.StatusType.GET_SUCCESS);
+            assertEquals(response2.getStatus(),
+                    KVMessage.StatusType.GET_SUCCESS);
+            assertEquals(response1.getValue(), "410");
+            assertEquals(response2.getValue(), "79");
+        } finally {
+            if (kvStore != null) {
+                kvStore.disconnect();
             }
             if (server != null) {
                 server.shutDown();
