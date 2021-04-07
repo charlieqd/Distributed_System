@@ -3,6 +3,7 @@ package benchmarker;
 import client.KVStore;
 import logger.LogSetup;
 import org.apache.log4j.Level;
+import shared.Util;
 import shared.messages.KVMessage;
 
 import java.util.Arrays;
@@ -49,6 +50,7 @@ public class Benchmarker {
         private final BenchmarkResult result;
         private final int maxKey;
         private final int maxValue;
+        private final boolean useTransaction;
 
         private final Set<KVMessage.StatusType> ACCEPTABLE_RESPONSE_STATUSES = new HashSet<>(
                 Arrays.asList(KVMessage.StatusType.PUT_UPDATE,
@@ -59,9 +61,11 @@ public class Benchmarker {
         public BenchmarkerClient(String host,
                                  int port,
                                  int maxKey,
-                                 int maxValue) throws Exception {
+                                 int maxValue,
+                                 boolean useTransaction) throws Exception {
             this.maxKey = maxKey;
             this.maxValue = maxValue;
+            this.useTransaction = useTransaction;
             result = new BenchmarkResult();
             kvStore = new KVStore(host, port);
             try {
@@ -84,20 +88,78 @@ public class Benchmarker {
                     currentTime = getTimeMs();
 
                     long start = getTimeMs();
-                    KVMessage response;
-                    if (random.nextFloat() < PUT_PROBABILITY) {
-                        response = kvStore
-                                .put(getRandomKey(), getRandomValue());
+
+                    if (useTransaction) {
+                        try {
+                            kvStore.runTransaction(kvStore -> {
+                                int value1 = 0;
+                                int value2 = 0;
+                                String key1 = getRandomKey();
+                                String key2 = getRandomKey();
+                                KVMessage message1 = kvStore
+                                        .transactionGet(key1);
+                                if (message1.getStatus() ==
+                                        KVMessage.StatusType.GET_SUCCESS) {
+                                    try {
+                                        value1 = Integer
+                                                .parseInt(message1.getValue());
+                                    } catch (NumberFormatException e) {
+                                        value1 = 0;
+                                    }
+                                }
+                                KVMessage response1 = kvStore
+                                        .transactionPut(key1,
+                                                Integer.toString(value1 - 10));
+                                if (!ACCEPTABLE_RESPONSE_STATUSES
+                                        .contains(response1.getStatus())) {
+                                    throw new IllegalStateException(
+                                            "Invalid response: " +
+                                                    response1.toString());
+                                }
+                                KVMessage message2 = kvStore
+                                        .transactionGet(key2);
+                                if (message2.getStatus() ==
+                                        KVMessage.StatusType.GET_SUCCESS) {
+                                    try {
+                                        value2 = Integer
+                                                .parseInt(message2.getValue());
+                                    } catch (NumberFormatException e) {
+                                        value2 = 0;
+                                    }
+                                }
+                                KVMessage response2 = kvStore
+                                        .transactionPut(key2,
+                                                Integer.toString(value2 + 10));
+                                if (!ACCEPTABLE_RESPONSE_STATUSES
+                                        .contains(response2.getStatus())) {
+                                    throw new IllegalStateException(
+                                            "Invalid response: " +
+                                                    response2.toString());
+                                }
+                            });
+                        } catch (Exception e) {
+                            result.errorMessage.set(String
+                                    .format("Failed to execute transaction: %s",
+                                            Util.getStackTraceString(e)));
+                            return;
+                        }
                     } else {
-                        response = kvStore.get(getRandomKey());
+                        KVMessage response;
+                        if (random.nextFloat() < PUT_PROBABILITY) {
+                            response = kvStore
+                                    .put(getRandomKey(), getRandomValue());
+                        } else {
+                            response = kvStore.get(getRandomKey());
+                        }
+                        if (!ACCEPTABLE_RESPONSE_STATUSES
+                                .contains(response.getStatus())) {
+                            result.errorMessage.set(String
+                                    .format("Server responded with status %s",
+                                            response.getStatus().name()));
+                            return;
+                        }
                     }
-                    if (!ACCEPTABLE_RESPONSE_STATUSES
-                            .contains(response.getStatus())) {
-                        result.errorMessage.set(String
-                                .format("Server responded with status %s",
-                                        response.getStatus().name()));
-                        return;
-                    }
+
                     long end = getTimeMs();
 
                     if (currentTime - startTime > WARM_UP_TIME_MILLIS) {
@@ -151,6 +213,63 @@ public class Benchmarker {
         int port = Integer.parseInt(args[2]);
         int maxKey = Integer.parseInt(args[3]);
         int maxValue = Integer.parseInt(args[4]);
+        // System.out.println("Benchmarking regular requests:");
+        // benchmark(numClients, host, port, maxKey, maxValue, false);
+        System.out.println("Benchmarking transaction requests:");
+        benchmark(numClients, host, port, maxKey, maxValue, true);
+        System.out.println("Checking sum of data:");
+        checkDataSum(host, port, maxKey);
+    }
+
+    private void checkDataSum(String host, int port, int maxKey) {
+        KVStore kvStore = null;
+        try {
+            kvStore = new KVStore(host, port);
+            kvStore.connect();
+
+            int sum = 0;
+            int min = Integer.MAX_VALUE;
+            int max = Integer.MIN_VALUE;
+
+            for (int i = 0; i < maxKey; ++i) {
+                int value = 0;
+                KVMessage response = kvStore.get(Integer.toString(i));
+                if (response.getStatus() ==
+                        KVMessage.StatusType.GET_SUCCESS) {
+                    try {
+                        value = Integer
+                                .parseInt(response.getValue());
+                    } catch (NumberFormatException e) {
+                        value = 0;
+                    }
+                }
+                sum += value;
+                min = Math.min(value, min);
+                max = Math.max(value, max);
+            }
+
+            System.out.printf("Sum: %d, Min: %d, Max: %d\n", sum, min, max);
+
+            if (sum != 0) {
+                System.out.println("Error: sum of all keys is not 0");
+            }
+
+        } catch (Exception e) {
+            System.out.println("Error: exception occurred during sum check: " +
+                    Util.getStackTraceString(e));
+        } finally {
+            if (kvStore != null) {
+                kvStore.disconnect();
+            }
+        }
+    }
+
+    private void benchmark(int numClients,
+                           String host,
+                           int port,
+                           int maxKey,
+                           int maxValue,
+                           boolean useTransaction) throws Exception {
         BenchmarkerClient[] clients = new BenchmarkerClient[numClients];
 
         System.out.printf("Starting %d clients to connect to %s:%d...\n",
@@ -159,7 +278,8 @@ public class Benchmarker {
         System.out.printf("Max key: %d, max value: %d\n", maxKey, maxValue);
 
         for (int i = 0; i < numClients; ++i) {
-            clients[i] = new BenchmarkerClient(host, port, maxKey, maxValue);
+            clients[i] = new BenchmarkerClient(host, port, maxKey, maxValue,
+                    useTransaction);
             clients[i].start();
         }
 
