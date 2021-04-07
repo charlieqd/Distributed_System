@@ -1482,12 +1482,12 @@ public class AdditionalTest {
 
             KVMessage response1 = kvStore.get("a");
             KVMessage response2 = kvStore.get("b");
-            assertEquals(response1.getStatus(),
-                    KVMessage.StatusType.GET_SUCCESS);
-            assertEquals(response2.getStatus(),
-                    KVMessage.StatusType.GET_SUCCESS);
-            assertEquals(response1.getValue(), "410");
-            assertEquals(response2.getValue(), "79");
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    response1.getStatus());
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    response2.getStatus());
+            assertEquals("410", response1.getValue());
+            assertEquals("79", response2.getValue());
         } finally {
             if (kvStore != null) {
                 kvStore.disconnect();
