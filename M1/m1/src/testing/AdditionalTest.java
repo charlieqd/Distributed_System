@@ -1127,7 +1127,8 @@ public class AdditionalTest {
         ServerConnection connection = null;
         try {
             String rootPath = folder.newFolder().toString();
-            KVStorage storage = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
                     1024, IKVServer.CacheStrategy.LRU);
             server = new KVServer(storage, new Protocol(),
                     new KVMessageSerializer(), 50001, "testServer", null);
@@ -1142,7 +1143,8 @@ public class AdditionalTest {
             int id = connection.sendRequest(null, null,
                     KVMessage.StatusType.TRANSACTION_BEGIN);
             KVMessage message = connection.receiveMessage(id);
-            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS, message.getStatus());
+            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS,
+                    message.getStatus());
 
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -1166,7 +1168,8 @@ public class AdditionalTest {
         ServerConnection connection = null;
         try {
             String rootPath = folder.newFolder().toString();
-            KVStorage storage = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
                     1024, IKVServer.CacheStrategy.LRU);
             server = new KVServer(storage, new Protocol(),
                     new KVMessageSerializer(), 50001, "testServer", null);
@@ -1209,15 +1212,14 @@ public class AdditionalTest {
         ServerConnection connection = null;
         try {
             String rootPath = folder.newFolder().toString();
-            KVStorage storage = new KVStorage(rootPath, new MD5PrefixKeyHashStrategy(1),
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
                     1024, IKVServer.CacheStrategy.LRU);
             server = new KVServer(storage, new Protocol(),
                     new KVMessageSerializer(), 50001, "testServer", null);
             server.start();
             server.startServing();
             server.updateMetadata(new Metadata(Arrays.asList(
-                    new ECSNode("testServer2", "127.0.0.1", 50002,
-                            "0cc175b9c0f1b6a831c399e269772661"),
                     new ECSNode("testServer", "127.0.0.1", 50001,
                             "92eb5ffee6ae2fec3ad71c777531578f"))));
             Thread.sleep(1000);
@@ -1229,7 +1231,8 @@ public class AdditionalTest {
             int id0 = connection.sendRequest(null, null,
                     KVMessage.StatusType.TRANSACTION_BEGIN);
             KVMessage message0 = connection.receiveMessage(id0);
-            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS, message0.getStatus());
+            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS,
+                    message0.getStatus());
 
 
             int id = connection.sendRequest("b", "1",
@@ -1239,8 +1242,167 @@ public class AdditionalTest {
             int id1 = connection.sendRequest("b", null,
                     KVMessage.StatusType.TRANSACTION_GET);
             KVMessage message1 = connection.receiveMessage(id1);
-            assertEquals(KVMessage.StatusType.GET_SUCCESS, message1.getStatus());
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    message1.getStatus());
             assertEquals("1", message1.getValue());
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (connection != null) {
+                connection.disconnect(true);
+            }
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
+
+    @Test
+    public void testTransactionRollBack() throws IOException,
+            InterruptedException {
+
+        KVServer server = null;
+        ServerConnection connection = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
+                    1024, IKVServer.CacheStrategy.LRU);
+            server = new KVServer(storage, new Protocol(),
+                    new KVMessageSerializer(), 50001, "testServer", null);
+            server.start();
+            server.startServing();
+            server.updateMetadata(new Metadata(Arrays.asList(
+                    new ECSNode("testServer", "127.0.0.1", 50001,
+                            "92eb5ffee6ae2fec3ad71c777531578f"))));
+            Thread.sleep(1000);
+
+            connection = new ServerConnection(new Protocol(),
+                    new KVMessageSerializer(), "127.0.0.1", 50001);
+            connection.connect();
+
+            int id4 = connection.sendRequest("b", "0",
+                    KVMessage.StatusType.PUT);
+            KVMessage message4 = connection.receiveMessage(id4);
+
+            assertEquals(KVMessage.StatusType.PUT_SUCCESS,
+                    message4.getStatus());
+
+            int id0 = connection.sendRequest(null, null,
+                    KVMessage.StatusType.TRANSACTION_BEGIN);
+            KVMessage message0 = connection.receiveMessage(id0);
+            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS,
+                    message0.getStatus());
+
+            int id = connection.sendRequest("b", "1",
+                    KVMessage.StatusType.TRANSACTION_PUT);
+            KVMessage message = connection.receiveMessage(id);
+
+            assertEquals(KVMessage.StatusType.PUT_SUCCESS, message.getStatus());
+
+            int id1 = connection.sendRequest("b", null,
+                    KVMessage.StatusType.TRANSACTION_GET);
+            KVMessage message1 = connection.receiveMessage(id1);
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    message1.getStatus());
+            assertEquals("1", message1.getValue());
+
+            int id2 = connection.sendRequest(null, null,
+                    KVMessage.StatusType.TRANSACTION_ROLLBACK);
+            KVMessage message2 = connection.receiveMessage(id2);
+
+            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS,
+                    message2.getStatus());
+
+            int id3 = connection.sendRequest("b", null,
+                    KVMessage.StatusType.GET);
+            KVMessage message3 = connection.receiveMessage(id3);
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    message1.getStatus());
+            assertEquals("0", message3.getValue());
+
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (connection != null) {
+                connection.disconnect(true);
+            }
+            if (server != null) {
+                server.shutDown();
+            }
+        }
+    }
+
+    @Test
+    public void testTransactionCommit() throws IOException,
+            InterruptedException {
+
+        KVServer server = null;
+        ServerConnection connection = null;
+        try {
+            String rootPath = folder.newFolder().toString();
+            KVStorage storage = new KVStorage(rootPath,
+                    new MD5PrefixKeyHashStrategy(1),
+                    1024, IKVServer.CacheStrategy.LRU);
+            server = new KVServer(storage, new Protocol(),
+                    new KVMessageSerializer(), 50001, "testServer", null);
+            server.start();
+            server.startServing();
+            server.updateMetadata(new Metadata(Arrays.asList(
+                    new ECSNode("testServer", "127.0.0.1", 50001,
+                            "92eb5ffee6ae2fec3ad71c777531578f"))));
+            Thread.sleep(1000);
+
+            connection = new ServerConnection(new Protocol(),
+                    new KVMessageSerializer(), "127.0.0.1", 50001);
+            connection.connect();
+
+            int id4 = connection.sendRequest("b", "0",
+                    KVMessage.StatusType.PUT);
+            KVMessage message4 = connection.receiveMessage(id4);
+
+            assertEquals(KVMessage.StatusType.PUT_SUCCESS,
+                    message4.getStatus());
+
+            int id0 = connection.sendRequest(null, null,
+                    KVMessage.StatusType.TRANSACTION_BEGIN);
+            KVMessage message0 = connection.receiveMessage(id0);
+            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS,
+                    message0.getStatus());
+
+            int id = connection.sendRequest("b", "1",
+                    KVMessage.StatusType.TRANSACTION_PUT);
+            KVMessage message = connection.receiveMessage(id);
+
+            assertEquals(KVMessage.StatusType.PUT_SUCCESS, message.getStatus());
+
+            int id1 = connection.sendRequest("b", null,
+                    KVMessage.StatusType.GET);
+            KVMessage message1 = connection.receiveMessage(id1);
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    message1.getStatus());
+            assertEquals("0", message1.getValue());
+
+            int id2 = connection.sendRequest(null, null,
+                    KVMessage.StatusType.TRANSACTION_COMMIT);
+            KVMessage message2 = connection.receiveMessage(id2);
+
+            assertEquals(KVMessage.StatusType.TRANSACTION_SUCCESS,
+                    message2.getStatus());
+
+            int id3 = connection.sendRequest("b", null,
+                    KVMessage.StatusType.GET);
+            KVMessage message3 = connection.receiveMessage(id3);
+            assertEquals(KVMessage.StatusType.GET_SUCCESS,
+                    message1.getStatus());
+            assertEquals("1", message3.getValue());
+
 
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
