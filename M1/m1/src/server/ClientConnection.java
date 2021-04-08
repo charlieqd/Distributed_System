@@ -339,6 +339,13 @@ public class ClientConnection implements Runnable {
 
             case ECS_PUT:
             case PUT: {
+                if (inTransaction.get()) {
+                    responseMessage = new KVMessageImpl(null,
+                            "Transaction started. Use TRANSACTION_PUT instead",
+                            KVMessage.StatusType.FAILED);
+                    break;
+                }
+
                 String key = requestMessage.getKey();
                 if (key == null) {
                     responseMessage = new KVMessageImpl(null, "Invalid key",

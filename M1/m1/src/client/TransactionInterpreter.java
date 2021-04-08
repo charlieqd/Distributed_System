@@ -182,7 +182,7 @@ public class TransactionInterpreter {
 
         @Override
         public String eval(ExecutionContext ctx) throws Exception {
-            String valueString = value.eval(ctx);
+            String valueString = value == null ? null : value.eval(ctx);
             KVMessage message = ctx.kvStore.transactionPut(key, valueString);
             if (!VALID_RESPONSE_STATUSES.contains(message.getStatus())) {
                 throw new IllegalStateException(
