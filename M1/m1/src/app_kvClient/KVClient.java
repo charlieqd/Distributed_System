@@ -329,10 +329,10 @@ public class KVClient implements IKVClient, KVStoreListener {
                 "\t insert or update a tuple. if value is not given, delete the tuple. \n");
         sb.append("delete <key>");
         sb.append("\t\t delete the tuple from the server \n");
-        sb.append("transaction [name]");
+        sb.append("transaction [<name>]");
         sb.append(
                 "\t executes a transaction. if name is given, executes the pre-defined transaction. \n");
-        sb.append("def transaction name");
+        sb.append("def transaction <name>");
         sb.append(
                 "\t defines a transaction with the given name. \n");
         sb.append("disconnect");
