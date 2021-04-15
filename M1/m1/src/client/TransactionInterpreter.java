@@ -307,7 +307,7 @@ public class TransactionInterpreter {
     }
 
     public TransactionRunner parse() {
-        instructions.clear();
+        instructions = new ArrayList<>();
         BufferedReader stdin = new BufferedReader(
                 new InputStreamReader(System.in));
         System.out.println("(Type \"help\" for help)");
